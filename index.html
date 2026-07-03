@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bonita · Agentes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF1F4; --surface:#FFFFFF; --ink:#14232E; --muted:#5A6B77;
+  --line:#D9E1E7; --accent:#0E7C8A; --accent-ink:#0A5560;
+  --amber:#D9A03F; --danger:#BF4B3A; --ok:#3E7A4E; --r:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:15px;line-height:1.45}
+button{font-family:inherit;cursor:pointer}
+textarea,select,input{font-family:inherit;font-size:14px;color:var(--ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+header{background:var(--ink);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{font-family:'Archivo',sans-serif;font-weight:800;letter-spacing:.06em;font-size:17px}
+.brand small{display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;font-size:10px;letter-spacing:.18em;color:#9FB3BF;margin-top:2px}
+nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap;align-items:center}
+nav button{background:transparent;border:none;color:#B9C7D0;padding:8px 14px;border-radius:8px;font-weight:600;font-size:14px}
+nav button.active{background:rgba(255,255,255,.14);color:#fff}
+nav button:hover{color:#fff}
+main{max-width:960px;margin:0 auto;padding:20px 16px 80px}
+
+/* login */
+.login-wrap{max-width:380px;margin:60px auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:28px}
+.login-wrap h1{font-family:'Archivo',sans-serif;font-size:20px;margin-bottom:4px}
+.login-wrap p{color:var(--muted);font-size:13px;margin-bottom:18px}
+.login-wrap input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;margin-bottom:10px}
+.login-err{color:var(--danger);font-size:13px;margin-bottom:10px;min-height:18px}
+
+.rail{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 14px;scrollbar-width:none}
+.rail::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 12px 7px 8px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;border-left:5px solid var(--vc,#888)}
+.chip b{font-family:'IBM Plex Mono',monospace;font-weight:500;background:var(--bg);border-radius:6px;padding:1px 7px;font-size:12px}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.toolbar select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.spacer{flex:1}
+.btn{border:none;border-radius:9px;padding:10px 16px;font-weight:600;font-size:14px;transition:filter .15s}
+.btn:hover{filter:brightness(.95)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-ghost{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+.btn-sm{padding:7px 12px;font-size:13px;border-radius:8px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:14px;overflow:hidden;border-left:6px solid var(--vc,#888)}
+.card-head{padding:14px 16px 0;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.venue-tag{font-family:'Archivo',sans-serif;font-weight:700;font-size:13px;letter-spacing:.02em;color:var(--vc)}
+.meta{font-size:12px;color:var(--muted)}
+.platform{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--bg);border-radius:6px;padding:2px 8px;color:var(--muted)}
+.stars{color:var(--amber);letter-spacing:2px;font-size:13px}
+.stars .off{color:var(--line)}
+.review-body{padding:10px 16px 4px}
+.review-body .author{font-weight:600;font-size:13px}
+.review-body p{margin-top:4px;color:#2A3B47}
+.draft{margin:12px 16px 14px;background:#F4F8F8;border:1px dashed #BFD6D9;border-radius:10px;padding:12px}
+.draft-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:6px}
+.draft p{font-size:14px;color:#1E3238;white-space:pre-wrap}
+.draft textarea{width:100%;min-height:90px;border:1px solid var(--accent);border-radius:8px;padding:10px;background:#fff;resize:vertical}
+.draft-empty{color:var(--muted);font-style:italic;font-size:14px}
+.card-actions{display:flex;gap:8px;padding:0 16px 14px;flex-wrap:wrap}
+.status-pill{font-size:12px;font-weight:600;border-radius:999px;padding:3px 10px}
+.st-pendiente{background:#FBF3E2;color:#8A6414}
+.st-borrador{background:#E6F2F3;color:var(--accent-ink)}
+.st-publicada{background:#E8F2EA;color:var(--ok)}
+.st-descartada{background:#F2E9E7;color:var(--danger)}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:36px 20px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--ink);margin-bottom:6px;font-family:'Archivo',sans-serif}
+
+h2{font-family:'Archivo',sans-serif;font-weight:800;font-size:20px;margin:6px 0 14px}
+.note{background:#FFF8EC;border:1px solid #EAD9AE;border-radius:10px;padding:12px 14px;font-size:13px;color:#6B5518;margin-bottom:16px}
+
+.agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.agent{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.agent h3{font-family:'Archivo',sans-serif;font-size:15px;font-weight:700}
+.agent .dom{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.agent p{font-size:13px;color:var(--muted);margin:8px 0 12px}
+.agent-foot{display:flex;justify-content:space-between;align-items:center;font-size:12px}
+.badge-on{color:var(--ok);font-weight:700}
+.badge-off{color:var(--muted)}
+.badge-soon{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;background:var(--bg);border-radius:6px;padding:3px 8px;color:var(--muted)}
+
+table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;font-size:13px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line)}
+th{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);background:#F6F9FA}
+td.num{font-family:'IBM Plex Mono',monospace}
+tr:last-child td{border-bottom:none}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.kpi .v{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:500}
+.kpi .l{font-size:12px;color:var(--muted);margin-top:2px}
+
+.tone-block{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--vc);border-radius:var(--r);padding:14px 16px;margin-bottom:12px}
+.tone-block label{font-family:'Archivo',sans-serif;font-weight:700;font-size:14px;color:var(--vc);display:block;margin-bottom:8px}
+.tone-block textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical}
+.save-row{display:flex;gap:10px;align-items:center;margin-top:10px}
+.saved-msg{color:var(--ok);font-size:13px;font-weight:600;opacity:0;transition:opacity .3s}
+.saved-msg.show{opacity:1}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.loading-page{text-align:center;color:var(--muted);padding:60px 20px}
+
+@media (max-width:640px){
+  header{padding:12px 14px}
+  nav{width:100%;margin-left:0}
+  nav button{padding:7px 10px;font-size:13px}
+  main{padding:14px 10px 80px}
+  .card-actions .btn{flex:1;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">BONITA · AGENTES<small id="mode-label">PANEL DE CONTROL</small></div>
+  <nav id="nav" style="display:none">
+    <button data-view="bandeja" class="active">Bandeja</button>
+    <button data-view="agentes">Agentes</button>
+    <button data-view="actividad">Actividad</button>
+    <button data-view="ajustes">Ajustes</button>
+    <button id="logout" title="Cerrar sesión">Salir</button>
+  </nav>
+</header>
+
+<main id="main"><div class="loading-page">Cargando…</div></main>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ================= CONFIG ================= */
+const SUPABASE_URL = "https://kuqhrszlxewonvkkjnsg.supabase.co";
+const SUPABASE_KEY = "sb_publishable_xmjbr4SQU_4K79wFdGYocg_v1NOj5R5";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const PRICE_IN = 3/1e6, PRICE_OUT = 15/1e6; // Sonnet 4.6 $/token
+
+const AGENTS = [
+ {id:"reviews",dom:"Bonita",name:"Analista de reseñas",desc:"Clasifica reseñas y comentarios de Google, Facebook e Instagram y redacta respuestas por local. Fase A: datos de prueba hasta conectar las APIs.",active:true},
+ {id:"comp",dom:"Bonita",name:"Vigilante de competencia",desc:"Rastreo semanal de competidores de Menorca: cartas, precios, reseñas, prensa.",soon:"FASE 3"},
+ {id:"audit",dom:"Bonita",name:"Auditor silencioso",desc:"Cruce diario Ágora × Skello × A3: anomalías de ticket, ratios y descuadres.",soon:"FASE 3"},
+ {id:"copilot",dom:"Bonita",name:"Copiloto de datos",desc:"Preguntas en lenguaje natural sobre ventas, ocupación y costes. Solo socios.",soon:"FASE 3"},
+ {id:"canal",dom:"Hostelero AI",name:"Prospector de canal",desc:"Gestorías y consultoras para el modelo de distribución de Hostelero AI.",soon:"FASE 3"},
+ {id:"riva",dom:"Hostelero AI",name:"Vigilante de entrantes",desc:"Seguimiento quincenal de Restaurants IA y nuevos competidores.",soon:"FASE 3"},
+ {id:"dist",dom:"Binifadet",name:"Prospector de distribuidores",desc:"Distribuidores y tiendas en península para variedades autóctonas.",soon:"FASE 3"},
+ {id:"astral",dom:"Astral Match",name:"Newsletter de tránsitos",desc:"Redacción semanal con borrador para aprobación antes de envío.",soon:"FASE 2"},
+ {id:"club",dom:"Club IA",name:"Preparador de sesiones",desc:"Material didáctico para las sesiones mensuales del Club de la IA.",soon:"FASE 2"}
+];
+
+/* ================= ESTADO ================= */
+let session=null, venues={}, reviews=[], runs=[], view="bandeja";
+let filters={venue:"all",status:"all",platform:"all"};
+
+const $ = s => document.querySelector(s);
+const esc = s => (s||"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2600); }
+function stars(n){ if(n==null) return ""; let s=""; for(let i=1;i<=5;i++) s+=`<span class="${i<=n?'':'off'}">★</span>`; return `<span class="stars">${s}</span>`; }
+function fmtDate(d){ return new Date(d+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}); }
+function money(v){ return "$"+Number(v).toFixed(4); }
+
+/* ================= AUTH ================= */
+async function init(){
+  const { data } = await sb.auth.getSession();
+  session = data.session;
+  sb.auth.onAuthStateChange((_e, s)=>{ session=s; if(!s) renderLogin(); });
+  if(!session) renderLogin(); else await enterApp();
+}
+
+function renderLogin(){
+  $("#nav").style.display="none";
+  $("#main").innerHTML = `<div class="login-wrap">
+    <h1>Bonita · Agentes</h1><p>Acceso restringido. Entra con tu cuenta.</p>
+    <div class="login-err" id="login-err"></div>
+    <input type="email" id="l-email" placeholder="Email" autocomplete="username">
+    <input type="password" id="l-pass" placeholder="Contraseña" autocomplete="current-password">
+    <button class="btn btn-primary" style="width:100%" id="l-go">Entrar</button>
+  </div>`;
+  $("#l-go").onclick = async ()=>{
+    const { data, error } = await sb.auth.signInWithPassword({ email:$("#l-email").value.trim(), password:$("#l-pass").value });
+    if(error){ $("#login-err").textContent = "No se pudo iniciar sesión. Revisa email y contraseña."; return; }
+    session = data.session; await enterApp();
+  };
+  $("#l-pass").addEventListener("keydown", e=>{ if(e.key==="Enter") $("#l-go").click(); });
+}
+
+async function enterApp(){
+  $("#nav").style.display="flex";
+  $("#logout").onclick = async ()=>{ await sb.auth.signOut(); };
+  await loadAll(); render();
+}
+
+/* ================= DATOS ================= */
+async function loadAll(){
+  const [t, r, ru] = await Promise.all([
+    sb.from("agent_tones").select("*").order("sort"),
+    sb.from("agent_reviews").select("*"),
+    sb.from("agent_runs").select("*").order("ts",{ascending:false}).limit(100)
+  ]);
+  if(t.error||r.error||ru.error){ toast("Error cargando datos de Supabase"); console.error(t.error||r.error||ru.error); return; }
+  venues = {}; t.data.forEach(v=> venues[v.venue]={name:v.name,color:v.color,tone:v.tone});
+  reviews = r.data; runs = ru.data;
+}
+
+/* ================= VISTAS ================= */
+function render(){
+  document.querySelectorAll("#nav [data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+  if(view==="bandeja") renderBandeja();
+  else if(view==="agentes") renderAgentes();
+  else if(view==="actividad") renderActividad();
+  else renderAjustes();
+}
+
+function renderBandeja(){
+  const f = filters;
+  const pendingByVenue = {};
+  reviews.forEach(r=>{ if(r.status==="pendiente"||r.status==="borrador"){ pendingByVenue[r.venue]=(pendingByVenue[r.venue]||0)+1; } });
+
+  const rail = Object.entries(venues).map(([k,v])=>
+    `<div class="chip" style="--vc:${v.color}">${esc(v.name.replace(" Binifadet","").replace("Restaurante ","Rest. "))} <b>${pendingByVenue[k]||0}</b></div>`).join("");
+
+  const list = reviews.filter(r=>
+    (f.venue==="all"||r.venue===f.venue) &&
+    (f.status==="all"||r.status===f.status) &&
+    (f.platform==="all"||r.platform===f.platform)
+  ).sort((a,b)=> (b.review_date||"").localeCompare(a.review_date||""));
+
+  const pendingCount = reviews.filter(r=>r.status==="pendiente").length;
+
+  $("#main").innerHTML = `
+    <div class="rail">${rail}</div>
+    <div class="toolbar">
+      <select id="f-venue"><option value="all">Todos los locales</option>${Object.entries(venues).map(([k,v])=>`<option value="${k}" ${f.venue===k?"selected":""}>${esc(v.name)}</option>`).join("")}</select>
+      <select id="f-status"><option value="all">Todos los estados</option>
+        <option value="pendiente" ${f.status==="pendiente"?"selected":""}>Pendiente</option>
+        <option value="borrador" ${f.status==="borrador"?"selected":""}>Con borrador</option>
+        <option value="publicada" ${f.status==="publicada"?"selected":""}>Publicada</option>
+        <option value="descartada" ${f.status==="descartada"?"selected":""}>Descartada</option></select>
+      <select id="f-platform"><option value="all">Todas las plataformas</option>
+        <option ${f.platform==="Google"?"selected":""}>Google</option>
+        <option ${f.platform==="Instagram"?"selected":""}>Instagram</option>
+        <option ${f.platform==="Facebook"?"selected":""}>Facebook</option></select>
+      <div class="spacer"></div>
+      <button class="btn btn-ghost" id="refresh" title="Recargar">↻</button>
+      <button class="btn btn-primary" id="run-agent" ${pendingCount===0?"disabled":""}>Generar borradores (${pendingCount})</button>
+    </div>
+    <div id="cards">${list.length? list.map(cardHTML).join("") : `<div class="empty"><b>Bandeja al día</b>No hay elementos con estos filtros. Cuando se conecten Google y Meta, las reseñas reales entrarán aquí solas.</div>`}</div>`;
+
+  $("#f-venue").onchange = e=>{filters.venue=e.target.value;render();};
+  $("#f-status").onchange = e=>{filters.status=e.target.value;render();};
+  $("#f-platform").onchange = e=>{filters.platform=e.target.value;render();};
+  $("#refresh").onclick = async ()=>{ await loadAll(); render(); toast("Actualizado"); };
+  $("#run-agent").onclick = runAgent;
+  bindCardActions();
+}
+
+function cardHTML(r){
+  const v = venues[r.venue] || {name:r.venue,color:"#888"};
+  let draftBlock;
+  if(r._editing){
+    draftBlock = `<div class="draft"><div class="draft-label">EDITANDO RESPUESTA</div>
+      <textarea id="edit-${r.id}">${esc(r.draft||"")}</textarea>
+      <div class="save-row"><button class="btn btn-primary btn-sm" data-act="saveedit" data-id="${r.id}">Guardar cambios</button>
+      <button class="btn btn-ghost btn-sm" data-act="canceledit" data-id="${r.id}">Cancelar</button></div></div>`;
+  } else if(r.draft){
+    draftBlock = `<div class="draft"><div class="draft-label">RESPUESTA PROPUESTA POR EL AGENTE</div><p>${esc(r.draft)}</p></div>`;
+  } else {
+    draftBlock = `<div class="draft"><p class="draft-empty">Sin borrador todavía. Pulsa «Generar borradores» arriba.</p></div>`;
+  }
+
+  const actions = r.status==="publicada" ? `<span class="status-pill st-publicada">Publicada${r.source==="mock"?" (simulado)":""}</span>`
+    : r.status==="descartada" ? `<span class="status-pill st-descartada">Descartada</span> <button class="btn btn-ghost btn-sm" data-act="restore" data-id="${r.id}">Recuperar</button>`
+    : r._editing ? ""
+    : `${r.draft?`<button class="btn btn-primary btn-sm" data-act="approve" data-id="${r.id}">Aprobar y publicar</button>
+        <button class="btn btn-ghost btn-sm" data-act="edit" data-id="${r.id}">Editar</button>
+        <button class="btn btn-ghost btn-sm" data-act="regen" data-id="${r.id}">Regenerar</button>`:""}
+       <button class="btn btn-ghost btn-sm" data-act="discard" data-id="${r.id}">Descartar</button>`;
+
+  const pill = r.status==="pendiente"?`<span class="status-pill st-pendiente">Pendiente</span>`
+    : r.status==="borrador"?`<span class="status-pill st-borrador">Borrador listo</span>`:"";
+
+  return `<article class="card" style="--vc:${v.color}">
+    <div class="card-head">
+      <span class="venue-tag">${esc(v.name)}</span>
+      <span class="platform">${esc(r.platform)}</span>
+      ${stars(r.rating)}
+      <span class="meta">${r.review_date?fmtDate(r.review_date):""}</span>
+      <div class="spacer"></div>${pill}
+    </div>
+    <div class="review-body"><span class="author">${esc(r.author)}</span><p>${esc(r.text)}</p></div>
+    ${draftBlock}
+    <div class="card-actions">${actions}</div>
+  </article>`;
+}
+
+async function setReview(id, patch){
+  const { error } = await sb.from("agent_reviews").update({...patch, updated_at:new Date().toISOString()}).eq("id", id);
+  if(error){ toast("No se pudo guardar el cambio"); console.error(error); return false; }
+  const r = reviews.find(x=>x.id===id); Object.assign(r, patch);
+  return true;
+}
+
+function bindCardActions(){
+  document.querySelectorAll("[data-act]").forEach(btn=>{
+    btn.onclick = async ()=>{
+      const r = reviews.find(x=>x.id===btn.dataset.id);
+      const act = btn.dataset.act;
+      if(act==="approve"){ if(await setReview(r.id,{status:"publicada"})) toast(r.source==="mock"?"Aprobada. En producción se publicaría ahora en "+r.platform+".":"Aprobada y en cola de publicación."); }
+      else if(act==="discard"){ await setReview(r.id,{status:"descartada"}); }
+      else if(act==="restore"){ await setReview(r.id,{status:r.draft?"borrador":"pendiente"}); }
+      else if(act==="edit"){ r._editing = true; }
+      else if(act==="canceledit"){ r._editing = false; }
+      else if(act==="saveedit"){ const val=document.getElementById("edit-"+r.id).value.trim(); if(await setReview(r.id,{draft:val,status:"borrador"})){ r._editing=false; toast("Borrador actualizado."); } }
+      else if(act==="regen"){ await generateDrafts([r], btn); }
+      render();
+    };
+  });
+}
+
+/* ================= MOTOR ================= */
+async function runAgent(){
+  const pending = reviews.filter(r=>r.status==="pendiente");
+  if(pending.length) await generateDrafts(pending, $("#run-agent"));
+}
+
+async function generateDrafts(items, btn){
+  const original = btn ? btn.innerHTML : "";
+  if(btn){ btn.disabled=true; btn.innerHTML=`<span class="spin"></span>Redactando…`; }
+  const payload = items.map(r=>({id:r.id, local:(venues[r.venue]||{}).name||r.venue, plataforma:r.platform,
+    valoracion:r.rating, idioma:r.lang, autor:r.author, texto:r.text, tono:(venues[r.venue]||{}).tone||""}));
+  try{
+    const res = await fetch("/api/generar",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
+      body:JSON.stringify({reviews:payload})
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||"Error del servidor");
+    let applied = 0;
+    for(const d of data.drafts||[]){
+      const r = reviews.find(x=>x.id===d.id);
+      if(r && d.respuesta && await setReview(r.id,{draft:d.respuesta.trim(),status:"borrador"})) applied++;
+    }
+    const inTok = data.usage?.input_tokens||0, outTok = data.usage?.output_tokens||0;
+    const cost = inTok*PRICE_IN + outTok*PRICE_OUT;
+    const { error } = await sb.from("agent_runs").insert({agent:"Analista de reseñas",items:applied,tokens_in:inTok,tokens_out:outTok,cost});
+    if(!error) runs.unshift({ts:new Date().toISOString(),agent:"Analista de reseñas",items:applied,tokens_in:inTok,tokens_out:outTok,cost});
+    toast(`${applied} borrador${applied!==1?"es":""} generado${applied!==1?"s":""} · ${money(cost)}`);
+  }catch(err){
+    console.error(err);
+    toast("No se pudieron generar los borradores. Reintenta en unos segundos.");
+  }finally{
+    if(btn){ btn.disabled=false; btn.innerHTML=original; }
+    render();
+  }
+}
+
+/* ================= OTRAS VISTAS ================= */
+function renderAgentes(){
+  $("#main").innerHTML = `<h2>Catálogo de agentes</h2>
+  <div class="note">Solo el Analista de reseñas está operativo. El resto del catálogo está definido y se activará por fases según el plan.</div>
+  <div class="agent-grid">${AGENTS.map(a=>`
+    <div class="agent">
+      <div class="dom">${esc(a.dom)}</div>
+      <h3>${esc(a.name)}</h3>
+      <p>${esc(a.desc)}</p>
+      <div class="agent-foot">
+        ${a.active?`<span class="badge-on">● Activo</span>`:`<span class="badge-off">○ Inactivo</span>`}
+        ${a.soon?`<span class="badge-soon">${a.soon}</span>`:""}
+      </div>
+    </div>`).join("")}</div>`;
+}
+
+function renderActividad(){
+  const tin = runs.reduce((a,r)=>a+(r.tokens_in||0),0), tout = runs.reduce((a,r)=>a+(r.tokens_out||0),0);
+  const cost = runs.reduce((a,r)=>a+Number(r.cost||0),0);
+  $("#main").innerHTML = `<h2>Actividad y coste</h2>
+  <div class="kpis">
+    <div class="kpi"><div class="v">${runs.length}</div><div class="l">Ejecuciones</div></div>
+    <div class="kpi"><div class="v">${(tin+tout).toLocaleString("es-ES")}</div><div class="l">Tokens totales</div></div>
+    <div class="kpi"><div class="v">${money(cost)}</div><div class="l">Coste acumulado (Sonnet 4.6)</div></div>
+    <div class="kpi"><div class="v">${reviews.filter(r=>r.status==="publicada").length}</div><div class="l">Respuestas publicadas</div></div>
+  </div>
+  ${runs.length? `<table><thead><tr><th>Fecha</th><th>Agente</th><th>Ítems</th><th>Tokens in</th><th>Tokens out</th><th>Coste</th></tr></thead>
+  <tbody>${runs.map(r=>`<tr><td>${new Date(r.ts).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</td>
+    <td>${esc(r.agent)}</td><td class="num">${r.items}</td><td class="num">${(r.tokens_in||0).toLocaleString("es-ES")}</td>
+    <td class="num">${(r.tokens_out||0).toLocaleString("es-ES")}</td><td class="num">${money(r.cost||0)}</td></tr>`).join("")}</tbody></table>`
+  : `<div class="empty"><b>Sin ejecuciones todavía</b>Genera borradores desde la Bandeja y aquí quedará el registro con tokens y coste de cada run: el contador de la luz de la plataforma.</div>`}
+  <div style="margin-top:16px"><button class="btn btn-ghost" id="reset">Restaurar reseñas de prueba</button></div>`;
+  $("#reset").onclick = async ()=>{
+    if(!confirm("¿Restaurar las reseñas de prueba a estado pendiente? El historial de ejecuciones se conserva.")) return;
+    const { error } = await sb.from("agent_reviews").update({status:"pendiente",draft:null}).eq("source","mock");
+    if(error){ toast("No se pudo restaurar"); return; }
+    await loadAll(); render(); toast("Reseñas de prueba restauradas");
+  };
+}
+
+function renderAjustes(){
+  $("#main").innerHTML = `<h2>Tono por local</h2>
+  <div class="note">Esto es el ingrediente clave: cómo suena cada local. El agente sigue estas instrucciones al redactar. Ajústalas con Patricia y regenera borradores para calibrar.</div>
+  ${Object.entries(venues).map(([k,v])=>`
+    <div class="tone-block" style="--vc:${v.color}">
+      <label>${esc(v.name)}</label>
+      <textarea data-tone="${k}">${esc(v.tone)}</textarea>
+    </div>`).join("")}
+  <div class="save-row">
+    <button class="btn btn-primary" id="save-tones">Guardar tonos</button>
+    <span class="saved-msg" id="saved-msg">Guardado ✓</span>
+  </div>
+  <h2 style="margin-top:28px">Autopublicación (Nivel 2)</h2>
+  <div class="note">Deshabilitado por diseño en esta fase. Cuando haya confianza: autopublicar solo reseñas de 5★ sin queja; todo lo demás sigue pasando por aprobación humana.</div>`;
+  $("#save-tones").onclick = async ()=>{
+    for(const t of document.querySelectorAll("[data-tone]")){
+      const { error } = await sb.from("agent_tones").update({tone:t.value.trim(),updated_at:new Date().toISOString()}).eq("venue",t.dataset.tone);
+      if(error){ toast("No se pudieron guardar los tonos"); return; }
+      venues[t.dataset.tone].tone = t.value.trim();
+    }
+    const m=$("#saved-msg"); m.classList.add("show"); setTimeout(()=>m.classList.remove("show"),2000);
+  };
+}
+
+/* ================= INICIO ================= */
+document.querySelectorAll("#nav [data-view]").forEach(b=> b.onclick = ()=>{ view=b.dataset.view; render(); });
+init();
+</script>
+</body>
+</html>
