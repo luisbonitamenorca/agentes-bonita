@@ -185,6 +185,7 @@ tr:last-child td{border-bottom:none}
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 /* ================= CONFIG ================= */
 const SUPABASE_URL = "https://kuqhrszlxewonvkkjnsg.supabase.co";
@@ -208,6 +209,7 @@ const AGENTS = [
 /* ================= ESTADO ================= */
 let session=null, venues={}, reviews=[], runs=[], view="bandeja";
 let waChats=[], waMsgs={}, waActive=null, waBusy=false, waChannel=null, waFilter="all";
+let knowledge=[];
 let filters={venue:"all",status:"all",platform:"all"};
 
 const $ = s => document.querySelector(s);
@@ -253,16 +255,17 @@ async function enterApp(){
 
 /* ================= DATOS ================= */
 async function loadAll(){
-  const [t, r, ru, wc, wm] = await Promise.all([
+  const [t, r, ru, wc, wm, kn] = await Promise.all([
     sb.from("agent_tones").select("*").order("sort"),
     sb.from("agent_reviews").select("*"),
     sb.from("agent_runs").select("*").order("ts",{ascending:false}).limit(100),
     sb.from("agent_wa_chats").select("*").order("last_ts",{ascending:false}),
-    sb.from("agent_wa_messages").select("*").order("ts")
+    sb.from("agent_wa_messages").select("*").order("ts"),
+    sb.from("agent_knowledge").select("*").order("updated_at",{ascending:false})
   ]);
-  if(t.error||r.error||ru.error||wc.error||wm.error){ toast("Error cargando datos de Supabase"); console.error(t.error||r.error||ru.error||wc.error||wm.error); return; }
+  if(t.error||r.error||ru.error||wc.error||wm.error||kn.error){ toast("Error cargando datos de Supabase"); console.error(t.error||r.error||ru.error||wc.error||wm.error||kn.error); return; }
   venues = {}; t.data.forEach(v=> venues[v.venue]={name:v.name,color:v.color,tone:v.tone});
-  reviews = r.data; runs = ru.data;
+  reviews = r.data; runs = ru.data; knowledge = kn.data;
   waChats = wc.data; waMsgs = {};
   wm.data.forEach(m=>{ (waMsgs[m.chat_id] = waMsgs[m.chat_id]||[]).push(m); });
 }
@@ -580,11 +583,13 @@ async function agentReply(chat){
   waBusy = true; render();
   const v = venues[chat.venue]||{};
   const history = (waMsgs[chat.id]||[]).slice(-16).map(m=>({sender:m.sender,text:m.text}));
+  const kb = knowledge.filter(k=>k.venue===chat.venue && k.active)
+    .map(k=>"## "+k.title+"\n"+k.content).join("\n\n").slice(0,10000);
   try{
     const res = await fetch("/api/whatsapp",{
       method:"POST",
       headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
-      body:JSON.stringify({venue_name:v.name||chat.venue, tone:v.tone||"", customer:chat.customer_name, history})
+      body:JSON.stringify({venue_name:v.name||chat.venue, tone:v.tone||"", customer:chat.customer_name, history, conocimiento:kb})
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||"Error del servidor");
@@ -641,20 +646,54 @@ function renderActividad(){
 }
 
 /* ================= AJUSTES ================= */
+function knItemHTML(k){
+  const kb = Math.round((k.content||"").length/1000);
+  if(k._editing){
+    return `<div style="border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;background:#F9FBFB">
+      <input value="${esc(k.title)}" data-kn-title="${k.id}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;font-weight:600">
+      <textarea data-kn-content="${k.id}" style="width:100%;min-height:140px;border:1px solid var(--accent);border-radius:8px;padding:10px;resize:vertical;font-size:13px">${esc(k.content)}</textarea>
+      <div class="save-row">
+        <button class="btn btn-primary btn-sm" data-kn="save" data-id="${k.id}">Guardar</button>
+        <button class="btn btn-ghost btn-sm" data-kn="cancel" data-id="${k.id}">Cancelar</button>
+      </div></div>`;
+  }
+  return `<div style="display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:8px;background:#fff;${k.active?"":"opacity:.55"}">
+    <input type="checkbox" ${k.active?"checked":""} data-kn="toggle" data-id="${k.id}" title="Activo: el agente lo usa">
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(k.title)}</div>
+      <div class="meta">${k.source==="pdf"?"PDF · ":""}${kb<1?"<1":kb} k caracteres · ${k.active?"activo":"inactivo"}</div>
+    </div>
+    <button class="btn btn-ghost btn-sm" data-kn="edit" data-id="${k.id}">Ver / Editar</button>
+    <button class="btn btn-ghost btn-sm" data-kn="del" data-id="${k.id}" title="Borrar">✕</button>
+  </div>`;
+}
+
 function renderAjustes(){
-  $("#main").innerHTML = `<h2>Tono por local</h2>
-  <div class="note">Esto es el ingrediente clave: cómo suena cada local, en reseñas y en WhatsApp. Ajústalo con Patricia y prueba en el simulador para calibrar.</div>
-  ${Object.entries(venues).map(([k,v])=>`
+  $("#main").innerHTML = `<h2>Ajustes por local</h2>
+  <div class="note">Dos piezas por local: el <b>tono</b> (cómo suena) y la <b>base de conocimiento</b> (lo que sabe: horarios, cartas, políticas). El conserje de WhatsApp solo da datos concretos que estén en documentos activos — lo que no cargues aquí, no lo sabe. Sube un PDF (extrae el texto y te lo deja editable) o crea documentos de texto directamente.</div>
+  ${Object.entries(venues).map(([k,v])=>{
+    const docs = knowledge.filter(x=>x.venue===k);
+    return `
     <div class="tone-block" style="--vc:${v.color}">
       <label>${esc(v.name)}</label>
+      <div class="meta" style="margin-bottom:4px">Tono</div>
       <textarea data-tone="${k}">${esc(v.tone)}</textarea>
-    </div>`).join("")}
+      <div class="meta" style="margin:12px 0 6px">Base de conocimiento (${docs.filter(d=>d.active).length} activos de ${docs.length})</div>
+      ${docs.map(knItemHTML).join("") || `<div class="meta" style="margin-bottom:8px;font-style:italic">Sin documentos. El agente no dará ningún dato concreto de este local.</div>`}
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" data-kn="addtext" data-venue="${k}">＋ Documento de texto</button>
+        <button class="btn btn-ghost btn-sm" data-kn="addpdf" data-venue="${k}">＋ Subir PDF</button>
+        <input type="file" accept="application/pdf" data-kn-file="${k}" style="display:none">
+      </div>
+    </div>`;
+  }).join("")}
   <div class="save-row">
     <button class="btn btn-primary" id="save-tones">Guardar tonos</button>
     <span class="saved-msg" id="saved-msg">Guardado ✓</span>
   </div>
   <h2 style="margin-top:28px">Autopublicación y autonomía</h2>
   <div class="note">Reseñas: todo pasa por aprobación humana en esta fase. WhatsApp: el agente responde solo lo rutinario y escala quejas, grupos grandes, pagos y cambios de reserva — las reglas de escalado se afinarán con casos reales.</div>`;
+
   $("#save-tones").onclick = async ()=>{
     for(const t of document.querySelectorAll("[data-tone]")){
       const { error } = await sb.from("agent_tones").update({tone:t.value.trim(),updated_at:new Date().toISOString()}).eq("venue",t.dataset.tone);
@@ -663,6 +702,76 @@ function renderAjustes(){
     }
     const m=$("#saved-msg"); m.classList.add("show"); setTimeout(()=>m.classList.remove("show"),2000);
   };
+
+  document.querySelectorAll("[data-kn]").forEach(el=>{
+    el.onclick = async ()=>{
+      const act = el.dataset.kn;
+      if(act==="addtext"){
+        const title = prompt("Título del documento (p. ej. Horarios verano 2026):");
+        if(!title) return;
+        await knInsert(el.dataset.venue, title.trim(), "", "texto", true);
+      }
+      else if(act==="addpdf"){
+        document.querySelector(`[data-kn-file="${el.dataset.venue}"]`).click();
+      }
+      else if(act==="toggle"){
+        const k = knowledge.find(x=>x.id===el.dataset.id);
+        const { error } = await sb.from("agent_knowledge").update({active:!k.active,updated_at:new Date().toISOString()}).eq("id",k.id);
+        if(error){ toast("No se pudo cambiar"); return; }
+        k.active = !k.active; render();
+      }
+      else if(act==="edit"){ const k = knowledge.find(x=>x.id===el.dataset.id); k._editing=true; render(); }
+      else if(act==="cancel"){ const k = knowledge.find(x=>x.id===el.dataset.id); k._editing=false; render(); }
+      else if(act==="save"){
+        const k = knowledge.find(x=>x.id===el.dataset.id);
+        const title = document.querySelector(`[data-kn-title="${k.id}"]`).value.trim() || k.title;
+        const content = document.querySelector(`[data-kn-content="${k.id}"]`).value;
+        const { error } = await sb.from("agent_knowledge").update({title,content,updated_at:new Date().toISOString()}).eq("id",k.id);
+        if(error){ toast("No se pudo guardar"); return; }
+        k.title=title; k.content=content; k._editing=false; render(); toast("Documento guardado");
+      }
+      else if(act==="del"){
+        if(!confirm("¿Borrar este documento de conocimiento?")) return;
+        const { error } = await sb.from("agent_knowledge").delete().eq("id",el.dataset.id);
+        if(error){ toast("No se pudo borrar"); return; }
+        knowledge = knowledge.filter(x=>x.id!==el.dataset.id); render();
+      }
+    };
+  });
+
+  document.querySelectorAll("[data-kn-file]").forEach(inp=>{
+    inp.onchange = async ()=>{
+      const file = inp.files[0]; if(!file) return;
+      toast("Extrayendo texto del PDF…");
+      try{
+        const text = await pdfToText(file);
+        if(!text.trim()){ toast("No se pudo extraer texto (¿PDF escaneado sin OCR?). Crea un documento de texto y pégalo a mano."); return; }
+        await knInsert(inp.dataset.knFile, file.name.replace(/\.pdf$/i,""), text.slice(0,20000), "pdf", false);
+        toast("PDF cargado. Revisa el texto extraído antes de dejarlo definitivo.");
+      }catch(err){ console.error(err); toast("Error leyendo el PDF"); }
+      inp.value = "";
+    };
+  });
+}
+
+async function knInsert(venue, title, content, source, openEditor){
+  const { data, error } = await sb.from("agent_knowledge").insert({venue,title,content,source,active:true}).select().single();
+  if(error){ toast("No se pudo crear el documento"); console.error(error); return; }
+  if(openEditor) data._editing = true;
+  knowledge.unshift(data); render();
+}
+
+async function pdfToText(file){
+  const buf = await file.arrayBuffer();
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  let out = [];
+  for(let p=1; p<=pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    out.push(tc.items.map(i=>i.str).join(" "));
+  }
+  return out.join("\n\n").replace(/[ \t]{2,}/g," ").trim();
 }
 
 /* ================= INICIO ================= */
