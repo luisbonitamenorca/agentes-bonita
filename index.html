@@ -207,7 +207,7 @@ const AGENTS = [
 
 /* ================= ESTADO ================= */
 let session=null, venues={}, reviews=[], runs=[], view="bandeja";
-let waChats=[], waMsgs={}, waActive=null, waBusy=false, waChannel=null;
+let waChats=[], waMsgs={}, waActive=null, waBusy=false, waChannel=null, waFilter="all";
 let filters={venue:"all",status:"all",platform:"all"};
 
 const $ = s => document.querySelector(s);
@@ -451,7 +451,8 @@ function waStatusPill(st){
 }
 
 function renderWhatsapp(){
-  const listHTML = waChats.map(c=>{
+  const visibles = waChats.filter(c=> waFilter==="all" || c.venue===waFilter);
+  const listHTML = visibles.map(c=>{
     const v = venues[c.venue]||{name:c.venue,color:"#888"};
     const msgs = waMsgs[c.id]||[];
     const last = msgs[msgs.length-1];
@@ -510,15 +511,22 @@ function renderWhatsapp(){
 
   $("#main").innerHTML = `
     <div class="toolbar" style="margin-bottom:12px">
-      <h2 style="margin:0">WhatsApp — 6 líneas</h2>
+      <h2 style="margin:0">WhatsApp</h2>
+      <select id="wa-venue"><option value="all">Todos los locales</option>${Object.entries(venues).map(([k,v])=>`<option value="${k}" ${waFilter===k?"selected":""}>${esc(v.name)}</option>`).join("")}</select>
       <div class="spacer"></div>
       <span class="meta">Simulación · Cloud API pendiente de decisión con los equipos</span>
     </div>
     <div class="wa-wrap ${waActive?"chat-open":""}">
-      <div class="wa-list">${listHTML}</div>
+      <div class="wa-list">${listHTML || `<div class="wa-empty" style="padding:30px 14px">Sin conversaciones en este local.</div>`}</div>
       <div class="wa-thread" ${chat?`style="--vc:${(venues[chat.venue]||{}).color}"`:""}>${threadHTML}</div>
     </div>`;
 
+  $("#wa-venue").onchange = e=>{
+    waFilter = e.target.value;
+    const act = waChats.find(c=>c.id===waActive);
+    if(act && waFilter!=="all" && act.venue!==waFilter) waActive = null;
+    render();
+  };
   document.querySelectorAll(".wa-item").forEach(el=> el.onclick = ()=>{ waActive = el.dataset.chat; render(); });
   const back = $("#wa-back"); if(back) back.onclick = ()=>{ waActive=null; render(); };
   const msgsEl = $("#wa-msgs"); if(msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
