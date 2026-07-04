@@ -11,6 +11,7 @@
   --bg:#EDF1F4; --surface:#FFFFFF; --ink:#14232E; --muted:#5A6B77;
   --line:#D9E1E7; --accent:#0E7C8A; --accent-ink:#0A5560;
   --amber:#D9A03F; --danger:#BF4B3A; --ok:#3E7A4E; --r:12px;
+  --wa-bg:#E9EDEA; --wa-cliente:#FFFFFF; --wa-agente:#D6EDE4; --wa-humano:#14232E;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
@@ -28,8 +29,8 @@ nav button{background:transparent;border:none;color:#B9C7D0;padding:8px 14px;bor
 nav button.active{background:rgba(255,255,255,.14);color:#fff}
 nav button:hover{color:#fff}
 main{max-width:960px;margin:0 auto;padding:20px 16px 80px}
+main.wide{max-width:1200px}
 
-/* login */
 .login-wrap{max-width:380px;margin:60px auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:28px}
 .login-wrap h1{font-family:'Archivo',sans-serif;font-size:20px;margin-bottom:4px}
 .login-wrap p{color:var(--muted);font-size:13px;margin-bottom:18px}
@@ -48,6 +49,7 @@ main{max-width:960px;margin:0 auto;padding:20px 16px 80px}
 .btn:hover{filter:brightness(.95)}
 .btn-primary{background:var(--accent);color:#fff}
 .btn-ghost{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+.btn-danger{background:var(--danger);color:#fff}
 .btn-sm{padding:7px 12px;font-size:13px;border-radius:8px}
 .btn[disabled]{opacity:.5;cursor:not-allowed}
 
@@ -72,6 +74,9 @@ main{max-width:960px;margin:0 auto;padding:20px 16px 80px}
 .st-borrador{background:#E6F2F3;color:var(--accent-ink)}
 .st-publicada{background:#E8F2EA;color:var(--ok)}
 .st-descartada{background:#F2E9E7;color:var(--danger)}
+.st-agente{background:#E6F2F3;color:var(--accent-ink)}
+.st-escalado{background:#FBE9E2;color:#9A4A1F}
+.st-humano{background:#E8E9F5;color:#3D4384}
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:36px 20px;text-align:center;color:var(--muted)}
 .empty b{display:block;color:var(--ink);margin-bottom:6px;font-family:'Archivo',sans-serif}
 
@@ -105,18 +110,60 @@ tr:last-child td{border-bottom:none}
 .saved-msg{color:var(--ok);font-size:13px;font-weight:600;opacity:0;transition:opacity .3s}
 .saved-msg.show{opacity:1}
 
+/* ============ WHATSAPP ============ */
+.wa-wrap{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;height:calc(100vh - 210px);min-height:480px}
+.wa-list{width:320px;border-right:1px solid var(--line);overflow-y:auto;flex-shrink:0}
+.wa-item{display:flex;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;align-items:flex-start;border-left:5px solid var(--vc,#888)}
+.wa-item:hover{background:#F6F9FA}
+.wa-item.active{background:#EDF4F5}
+.wa-item .avatar{width:38px;height:38px;border-radius:50%;background:var(--vc,#888);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0}
+.wa-item .wi-body{flex:1;min-width:0}
+.wa-item .wi-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.wa-item .wi-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa-item .wi-time{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;flex-shrink:0}
+.wa-item .wi-venue{font-size:11px;color:var(--vc);font-weight:700}
+.wa-item .wi-snippet{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.wa-thread{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--wa-bg)}
+.wa-head{background:var(--surface);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.wa-head .avatar{width:34px;height:34px;border-radius:50%;background:var(--vc,#888);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+.wa-head .wh-name{font-weight:700;font-size:14px}
+.wa-head .wh-sub{font-size:11px;color:var(--muted)}
+.wa-msgs{flex:1;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;gap:8px}
+.bubble{max-width:72%;padding:8px 12px;border-radius:12px;font-size:14px;position:relative;box-shadow:0 1px 1px rgba(0,0,0,.06);white-space:pre-wrap}
+.bubble .b-meta{display:block;font-size:10px;color:rgba(0,0,0,.4);margin-top:4px;font-family:'IBM Plex Mono',monospace;text-align:right}
+.b-cliente{background:var(--wa-cliente);align-self:flex-start;border-top-left-radius:4px}
+.b-agente{background:var(--wa-agente);align-self:flex-end;border-top-right-radius:4px}
+.b-humano{background:var(--wa-humano);color:#fff;align-self:flex-end;border-top-right-radius:4px}
+.b-humano .b-meta{color:rgba(255,255,255,.55)}
+.b-label{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;display:block;margin-bottom:3px;color:var(--accent-ink)}
+.b-humano .b-label{color:#AEB6E8}
+.wa-typing{align-self:flex-end;font-size:12px;color:var(--muted);font-style:italic;padding:4px 8px}
+.wa-compose{background:var(--surface);border-top:1px solid var(--line);padding:10px 12px}
+.wa-compose .row{display:flex;gap:8px;align-items:center}
+.wa-compose input{flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:999px;background:#fff}
+.wa-compose .hint{font-size:11px;color:var(--muted);margin-top:6px;padding-left:4px}
+.wa-sim{background:#FFF8EC;border-top:1px dashed #EAD9AE}
+.wa-sim input{background:#FFFDF7}
+.wa-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;flex-direction:column;gap:8px;padding:20px;text-align:center}
+.wa-back{display:none}
+
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50;max-width:90vw;text-align:center}
 .toast.show{opacity:1}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes sp{to{transform:rotate(360deg)}}
 .loading-page{text-align:center;color:var(--muted);padding:60px 20px}
 
-@media (max-width:640px){
+@media (max-width:740px){
   header{padding:12px 14px}
   nav{width:100%;margin-left:0}
   nav button{padding:7px 10px;font-size:13px}
   main{padding:14px 10px 80px}
   .card-actions .btn{flex:1;text-align:center}
+  .wa-wrap{height:calc(100vh - 250px)}
+  .wa-list{width:100%;border-right:none}
+  .wa-wrap.chat-open .wa-list{display:none}
+  .wa-wrap:not(.chat-open) .wa-thread{display:none}
+  .wa-back{display:inline-flex}
 }
 </style>
 </head>
@@ -126,6 +173,7 @@ tr:last-child td{border-bottom:none}
   <div class="brand">BONITA · AGENTES<small id="mode-label">PANEL DE CONTROL</small></div>
   <nav id="nav" style="display:none">
     <button data-view="bandeja" class="active">Bandeja</button>
+    <button data-view="whatsapp">WhatsApp</button>
     <button data-view="agentes">Agentes</button>
     <button data-view="actividad">Actividad</button>
     <button data-view="ajustes">Ajustes</button>
@@ -142,22 +190,24 @@ tr:last-child td{border-bottom:none}
 const SUPABASE_URL = "https://kuqhrszlxewonvkkjnsg.supabase.co";
 const SUPABASE_KEY = "sb_publishable_xmjbr4SQU_4K79wFdGYocg_v1NOj5R5";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const PRICE_IN = 3/1e6, PRICE_OUT = 15/1e6; // Sonnet 4.6 $/token
+const PRICE_IN = 3/1e6, PRICE_OUT = 15/1e6;
 
 const AGENTS = [
  {id:"reviews",dom:"Bonita",name:"Analista de reseñas",desc:"Clasifica reseñas y comentarios de Google, Facebook e Instagram y redacta respuestas por local. Fase A: datos de prueba hasta conectar las APIs.",active:true},
+ {id:"wa",dom:"Bonita",name:"Conserje de WhatsApp",desc:"Atiende conversaciones de WhatsApp en tiempo real, responde lo rutinario y escala a humano lo delicado. En simulación hasta conectar la Cloud API.",active:true},
  {id:"comp",dom:"Bonita",name:"Vigilante de competencia",desc:"Rastreo semanal de competidores de Menorca: cartas, precios, reseñas, prensa.",soon:"FASE 3"},
  {id:"audit",dom:"Bonita",name:"Auditor silencioso",desc:"Cruce diario Ágora × Skello × A3: anomalías de ticket, ratios y descuadres.",soon:"FASE 3"},
  {id:"copilot",dom:"Bonita",name:"Copiloto de datos",desc:"Preguntas en lenguaje natural sobre ventas, ocupación y costes. Solo socios.",soon:"FASE 3"},
  {id:"canal",dom:"Hostelero AI",name:"Prospector de canal",desc:"Gestorías y consultoras para el modelo de distribución de Hostelero AI.",soon:"FASE 3"},
  {id:"riva",dom:"Hostelero AI",name:"Vigilante de entrantes",desc:"Seguimiento quincenal de Restaurants IA y nuevos competidores.",soon:"FASE 3"},
- {id:"dist",dom:"Binifadet",name:"Prospector de distribuidores",desc:"Distribuidores y tiendas en península para variedades autóctonas.",soon:"FASE 3"},
+ {id:"dist",dom:"Binifadet",name:"Prospector de distribuidores",desc:"Distribuidores y tiendas en península para variedades autóctonas. Pipeline completo: prospección, aprobación, contacto y muestras.",soon:"SIGUIENTE"},
  {id:"astral",dom:"Astral Match",name:"Newsletter de tránsitos",desc:"Redacción semanal con borrador para aprobación antes de envío.",soon:"FASE 2"},
  {id:"club",dom:"Club IA",name:"Preparador de sesiones",desc:"Material didáctico para las sesiones mensuales del Club de la IA.",soon:"FASE 2"}
 ];
 
 /* ================= ESTADO ================= */
 let session=null, venues={}, reviews=[], runs=[], view="bandeja";
+let waChats=[], waMsgs={}, waActive=null, waBusy=false, waChannel=null;
 let filters={venue:"all",status:"all",platform:"all"};
 
 const $ = s => document.querySelector(s);
@@ -165,7 +215,9 @@ const esc = s => (s||"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&g
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2600); }
 function stars(n){ if(n==null) return ""; let s=""; for(let i=1;i<=5;i++) s+=`<span class="${i<=n?'':'off'}">★</span>`; return `<span class="stars">${s}</span>`; }
 function fmtDate(d){ return new Date(d+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"}); }
+function fmtTime(ts){ return new Date(ts).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}); }
 function money(v){ return "$"+Number(v).toFixed(4); }
+function initials(name){ return name.split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase(); }
 
 /* ================= AUTH ================= */
 async function init(){
@@ -177,6 +229,7 @@ async function init(){
 
 function renderLogin(){
   $("#nav").style.display="none";
+  $("#main").className="";
   $("#main").innerHTML = `<div class="login-wrap">
     <h1>Bonita · Agentes</h1><p>Acceso restringido. Entra con tu cuenta.</p>
     <div class="login-err" id="login-err"></div>
@@ -194,31 +247,54 @@ function renderLogin(){
 
 async function enterApp(){
   $("#nav").style.display="flex";
-  $("#logout").onclick = async ()=>{ await sb.auth.signOut(); };
-  await loadAll(); render();
+  $("#logout").onclick = async ()=>{ if(waChannel) sb.removeChannel(waChannel); await sb.auth.signOut(); };
+  await loadAll(); subscribeWA(); render();
 }
 
 /* ================= DATOS ================= */
 async function loadAll(){
-  const [t, r, ru] = await Promise.all([
+  const [t, r, ru, wc, wm] = await Promise.all([
     sb.from("agent_tones").select("*").order("sort"),
     sb.from("agent_reviews").select("*"),
-    sb.from("agent_runs").select("*").order("ts",{ascending:false}).limit(100)
+    sb.from("agent_runs").select("*").order("ts",{ascending:false}).limit(100),
+    sb.from("agent_wa_chats").select("*").order("last_ts",{ascending:false}),
+    sb.from("agent_wa_messages").select("*").order("ts")
   ]);
-  if(t.error||r.error||ru.error){ toast("Error cargando datos de Supabase"); console.error(t.error||r.error||ru.error); return; }
+  if(t.error||r.error||ru.error||wc.error||wm.error){ toast("Error cargando datos de Supabase"); console.error(t.error||r.error||ru.error||wc.error||wm.error); return; }
   venues = {}; t.data.forEach(v=> venues[v.venue]={name:v.name,color:v.color,tone:v.tone});
   reviews = r.data; runs = ru.data;
+  waChats = wc.data; waMsgs = {};
+  wm.data.forEach(m=>{ (waMsgs[m.chat_id] = waMsgs[m.chat_id]||[]).push(m); });
 }
 
-/* ================= VISTAS ================= */
+/* Realtime: mensajes y cambios de estado entran solos */
+function subscribeWA(){
+  if(waChannel) sb.removeChannel(waChannel);
+  waChannel = sb.channel("wa-live")
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"agent_wa_messages"},payload=>{
+      const m = payload.new;
+      const arr = (waMsgs[m.chat_id] = waMsgs[m.chat_id]||[]);
+      if(!arr.some(x=>x.id===m.id)){ arr.push(m); if(view==="whatsapp") render(); }
+    })
+    .on("postgres_changes",{event:"UPDATE",schema:"public",table:"agent_wa_chats"},payload=>{
+      const c = waChats.find(x=>x.id===payload.new.id);
+      if(c){ Object.assign(c, payload.new); if(view==="whatsapp") render(); }
+    })
+    .subscribe();
+}
+
+/* ================= ROUTER ================= */
 function render(){
   document.querySelectorAll("#nav [data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+  $("#main").className = view==="whatsapp" ? "wide" : "";
   if(view==="bandeja") renderBandeja();
+  else if(view==="whatsapp") renderWhatsapp();
   else if(view==="agentes") renderAgentes();
   else if(view==="actividad") renderActividad();
   else renderAjustes();
 }
 
+/* ================= BANDEJA (reseñas) ================= */
 function renderBandeja(){
   const f = filters;
   const pendingByVenue = {};
@@ -325,7 +401,6 @@ function bindCardActions(){
   });
 }
 
-/* ================= MOTOR ================= */
 async function runAgent(){
   const pending = reviews.filter(r=>r.status==="pendiente");
   if(pending.length) await generateDrafts(pending, $("#run-agent"));
@@ -349,11 +424,8 @@ async function generateDrafts(items, btn){
       const r = reviews.find(x=>x.id===d.id);
       if(r && d.respuesta && await setReview(r.id,{draft:d.respuesta.trim(),status:"borrador"})) applied++;
     }
-    const inTok = data.usage?.input_tokens||0, outTok = data.usage?.output_tokens||0;
-    const cost = inTok*PRICE_IN + outTok*PRICE_OUT;
-    const { error } = await sb.from("agent_runs").insert({agent:"Analista de reseñas",items:applied,tokens_in:inTok,tokens_out:outTok,cost});
-    if(!error) runs.unshift({ts:new Date().toISOString(),agent:"Analista de reseñas",items:applied,tokens_in:inTok,tokens_out:outTok,cost});
-    toast(`${applied} borrador${applied!==1?"es":""} generado${applied!==1?"s":""} · ${money(cost)}`);
+    await logRun("Analista de reseñas", applied, data.usage);
+    toast(`${applied} borrador${applied!==1?"es":""} generado${applied!==1?"s":""}`);
   }catch(err){
     console.error(err);
     toast("No se pudieron generar los borradores. Reintenta en unos segundos.");
@@ -363,10 +435,166 @@ async function generateDrafts(items, btn){
   }
 }
 
-/* ================= OTRAS VISTAS ================= */
+async function logRun(agent, items, usage){
+  const inTok = (usage&&usage.input_tokens)||0, outTok = (usage&&usage.output_tokens)||0;
+  const cost = inTok*PRICE_IN + outTok*PRICE_OUT;
+  const { error } = await sb.from("agent_runs").insert({agent,items,tokens_in:inTok,tokens_out:outTok,cost});
+  if(!error) runs.unshift({ts:new Date().toISOString(),agent,items,tokens_in:inTok,tokens_out:outTok,cost});
+}
+
+/* ================= WHATSAPP ================= */
+function waStatusPill(st){
+  if(st==="agente") return `<span class="status-pill st-agente">Agente activo</span>`;
+  if(st==="escalado") return `<span class="status-pill st-escalado">Escalado — espera humano</span>`;
+  if(st==="humano") return `<span class="status-pill st-humano">Al mando: humano</span>`;
+  return `<span class="status-pill st-descartada">Cerrado</span>`;
+}
+
+function renderWhatsapp(){
+  const listHTML = waChats.map(c=>{
+    const v = venues[c.venue]||{name:c.venue,color:"#888"};
+    const msgs = waMsgs[c.id]||[];
+    const last = msgs[msgs.length-1];
+    return `<div class="wa-item ${waActive===c.id?"active":""}" data-chat="${c.id}" style="--vc:${v.color}">
+      <div class="avatar">${initials(c.customer_name)}</div>
+      <div class="wi-body">
+        <div class="wi-top"><span class="wi-name">${esc(c.customer_name)}</span><span class="wi-time">${last?fmtTime(last.ts):""}</span></div>
+        <div class="wi-venue">${esc(v.name)}</div>
+        <div class="wi-snippet">${last?esc(last.text):""}</div>
+        <div style="margin-top:4px">${waStatusPill(c.status)}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const chat = waChats.find(c=>c.id===waActive);
+  let threadHTML;
+  if(!chat){
+    threadHTML = `<div class="wa-empty"><b style="font-family:'Archivo',sans-serif;color:var(--ink)">Conserje de WhatsApp</b>
+      Selecciona una conversación para verla.<br>Modo simulación: escribe como cliente y mira al agente trabajar.</div>`;
+  } else {
+    const v = venues[chat.venue]||{name:chat.venue,color:"#888"};
+    const msgs = waMsgs[chat.id]||[];
+    const bubbles = msgs.map(m=>{
+      const cls = m.sender==="cliente"?"b-cliente":m.sender==="agente"?"b-agente":"b-humano";
+      const label = m.sender==="agente"?`<span class="b-label">Agente</span>`:m.sender==="humano"?`<span class="b-label">Equipo</span>`:"";
+      return `<div class="bubble ${cls}">${label}${esc(m.text)}<span class="b-meta">${fmtTime(m.ts)}</span></div>`;
+    }).join("");
+
+    const controls = chat.status==="humano"
+      ? `<button class="btn btn-ghost btn-sm" id="wa-return">Devolver al agente</button>`
+      : `<button class="btn btn-primary btn-sm" id="wa-take">Intervenir</button>`;
+
+    const composer = chat.status==="humano"
+      ? `<div class="wa-compose"><div class="row">
+           <input id="wa-input" placeholder="Escribe como el equipo…" autocomplete="off">
+           <button class="btn btn-primary btn-sm" id="wa-send">Enviar</button></div>
+         <div class="hint">Estás al mando de esta conversación. El agente no responderá mientras tanto.</div></div>`
+      : `<div class="wa-compose"><div class="hint" style="margin:2px 0 0">El agente atiende esta conversación. Pulsa «Intervenir» para tomar el control${chat.status==="escalado"?" — el agente la ha escalado y está esperando":""}.</div></div>`;
+
+    threadHTML = `
+      <div class="wa-head" style="--vc:${v.color}">
+        <button class="btn btn-ghost btn-sm wa-back" id="wa-back">←</button>
+        <div class="avatar">${initials(chat.customer_name)}</div>
+        <div><div class="wh-name">${esc(chat.customer_name)}</div>
+        <div class="wh-sub">${esc(v.name)} · ${esc(chat.phone_masked||"")}</div></div>
+        <div class="spacer"></div>
+        ${waStatusPill(chat.status)} ${controls}
+      </div>
+      <div class="wa-msgs" id="wa-msgs">${bubbles}${waBusy?`<div class="wa-typing">el agente está escribiendo…</div>`:""}</div>
+      ${composer}
+      <div class="wa-compose wa-sim"><div class="row">
+        <input id="wa-sim-input" placeholder="SIMULADOR — escribe como si fueras el cliente…" autocomplete="off">
+        <button class="btn btn-ghost btn-sm" id="wa-sim-send">Simular</button></div>
+      <div class="hint">Modo simulación: el mensaje entra como cliente y, si el agente está al mando, responde él solo.</div></div>`;
+  }
+
+  $("#main").innerHTML = `
+    <div class="toolbar" style="margin-bottom:12px">
+      <h2 style="margin:0">WhatsApp — 6 líneas</h2>
+      <div class="spacer"></div>
+      <span class="meta">Simulación · Cloud API pendiente de decisión con los equipos</span>
+    </div>
+    <div class="wa-wrap ${waActive?"chat-open":""}">
+      <div class="wa-list">${listHTML}</div>
+      <div class="wa-thread" ${chat?`style="--vc:${(venues[chat.venue]||{}).color}"`:""}>${threadHTML}</div>
+    </div>`;
+
+  document.querySelectorAll(".wa-item").forEach(el=> el.onclick = ()=>{ waActive = el.dataset.chat; render(); });
+  const back = $("#wa-back"); if(back) back.onclick = ()=>{ waActive=null; render(); };
+  const msgsEl = $("#wa-msgs"); if(msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
+
+  const take = $("#wa-take"); if(take) take.onclick = ()=> setChatStatus(waActive,"humano","Has tomado el control. El agente queda en pausa en este chat.");
+  const ret = $("#wa-return"); if(ret) ret.onclick = ()=> setChatStatus(waActive,"agente","El agente vuelve a estar al mando de este chat.");
+
+  const send = $("#wa-send");
+  if(send){
+    const doSend = async ()=>{
+      const inp = $("#wa-input"); const text = inp.value.trim(); if(!text) return;
+      inp.value=""; await insertMsg(waActive,"humano",text);
+    };
+    send.onclick = doSend;
+    $("#wa-input").addEventListener("keydown",e=>{ if(e.key==="Enter") doSend(); });
+  }
+
+  const simSend = $("#wa-sim-send");
+  if(simSend){
+    const doSim = async ()=>{
+      const inp = $("#wa-sim-input"); const text = inp.value.trim(); if(!text||waBusy) return;
+      inp.value="";
+      await insertMsg(waActive,"cliente",text);
+      const chat = waChats.find(c=>c.id===waActive);
+      if(chat && chat.status==="agente") await agentReply(chat);
+    };
+    simSend.onclick = doSim;
+    $("#wa-sim-input").addEventListener("keydown",e=>{ if(e.key==="Enter") doSim(); });
+  }
+}
+
+async function insertMsg(chatId, sender, text){
+  const { data, error } = await sb.from("agent_wa_messages").insert({chat_id:chatId,sender,text}).select().single();
+  if(error){ toast("No se pudo enviar"); console.error(error); return; }
+  const arr = (waMsgs[chatId]=waMsgs[chatId]||[]);
+  if(!arr.some(x=>x.id===data.id)) arr.push(data);
+  await sb.from("agent_wa_chats").update({last_ts:new Date().toISOString()}).eq("id",chatId);
+  const c = waChats.find(x=>x.id===chatId); if(c) c.last_ts = new Date().toISOString();
+  render();
+}
+
+async function setChatStatus(chatId, status, msg){
+  const { error } = await sb.from("agent_wa_chats").update({status}).eq("id",chatId);
+  if(error){ toast("No se pudo cambiar el estado"); return; }
+  const c = waChats.find(x=>x.id===chatId); if(c) c.status = status;
+  if(msg) toast(msg);
+  render();
+}
+
+async function agentReply(chat){
+  waBusy = true; render();
+  const v = venues[chat.venue]||{};
+  const history = (waMsgs[chat.id]||[]).slice(-16).map(m=>({sender:m.sender,text:m.text}));
+  try{
+    const res = await fetch("/api/whatsapp",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
+      body:JSON.stringify({venue_name:v.name||chat.venue, tone:v.tone||"", customer:chat.customer_name, history})
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||"Error del servidor");
+    waBusy = false;
+    await insertMsg(chat.id,"agente",data.mensaje);
+    if(data.accion==="escalar") await setChatStatus(chat.id,"escalado","El agente ha escalado esta conversación a humano.");
+    await logRun("Conserje WhatsApp",1,data.usage);
+  }catch(err){
+    console.error(err); waBusy = false;
+    toast("El agente no pudo responder. Reintenta.");
+    render();
+  }
+}
+
+/* ================= AGENTES ================= */
 function renderAgentes(){
   $("#main").innerHTML = `<h2>Catálogo de agentes</h2>
-  <div class="note">Solo el Analista de reseñas está operativo. El resto del catálogo está definido y se activará por fases según el plan.</div>
+  <div class="note">El Analista de reseñas y el Conserje de WhatsApp están operativos en simulación. El resto del catálogo está definido y se activará por fases según el plan.</div>
   <div class="agent-grid">${AGENTS.map(a=>`
     <div class="agent">
       <div class="dom">${esc(a.dom)}</div>
@@ -379,6 +607,7 @@ function renderAgentes(){
     </div>`).join("")}</div>`;
 }
 
+/* ================= ACTIVIDAD ================= */
 function renderActividad(){
   const tin = runs.reduce((a,r)=>a+(r.tokens_in||0),0), tout = runs.reduce((a,r)=>a+(r.tokens_out||0),0);
   const cost = runs.reduce((a,r)=>a+Number(r.cost||0),0);
@@ -393,7 +622,7 @@ function renderActividad(){
   <tbody>${runs.map(r=>`<tr><td>${new Date(r.ts).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</td>
     <td>${esc(r.agent)}</td><td class="num">${r.items}</td><td class="num">${(r.tokens_in||0).toLocaleString("es-ES")}</td>
     <td class="num">${(r.tokens_out||0).toLocaleString("es-ES")}</td><td class="num">${money(r.cost||0)}</td></tr>`).join("")}</tbody></table>`
-  : `<div class="empty"><b>Sin ejecuciones todavía</b>Genera borradores desde la Bandeja y aquí quedará el registro con tokens y coste de cada run: el contador de la luz de la plataforma.</div>`}
+  : `<div class="empty"><b>Sin ejecuciones todavía</b>Genera borradores desde la Bandeja o habla con el conserje de WhatsApp y aquí quedará el registro con tokens y coste de cada run.</div>`}
   <div style="margin-top:16px"><button class="btn btn-ghost" id="reset">Restaurar reseñas de prueba</button></div>`;
   $("#reset").onclick = async ()=>{
     if(!confirm("¿Restaurar las reseñas de prueba a estado pendiente? El historial de ejecuciones se conserva.")) return;
@@ -403,9 +632,10 @@ function renderActividad(){
   };
 }
 
+/* ================= AJUSTES ================= */
 function renderAjustes(){
   $("#main").innerHTML = `<h2>Tono por local</h2>
-  <div class="note">Esto es el ingrediente clave: cómo suena cada local. El agente sigue estas instrucciones al redactar. Ajústalas con Patricia y regenera borradores para calibrar.</div>
+  <div class="note">Esto es el ingrediente clave: cómo suena cada local, en reseñas y en WhatsApp. Ajústalo con Patricia y prueba en el simulador para calibrar.</div>
   ${Object.entries(venues).map(([k,v])=>`
     <div class="tone-block" style="--vc:${v.color}">
       <label>${esc(v.name)}</label>
@@ -415,8 +645,8 @@ function renderAjustes(){
     <button class="btn btn-primary" id="save-tones">Guardar tonos</button>
     <span class="saved-msg" id="saved-msg">Guardado ✓</span>
   </div>
-  <h2 style="margin-top:28px">Autopublicación (Nivel 2)</h2>
-  <div class="note">Deshabilitado por diseño en esta fase. Cuando haya confianza: autopublicar solo reseñas de 5★ sin queja; todo lo demás sigue pasando por aprobación humana.</div>`;
+  <h2 style="margin-top:28px">Autopublicación y autonomía</h2>
+  <div class="note">Reseñas: todo pasa por aprobación humana en esta fase. WhatsApp: el agente responde solo lo rutinario y escala quejas, grupos grandes, pagos y cambios de reserva — las reglas de escalado se afinarán con casos reales.</div>`;
   $("#save-tones").onclick = async ()=>{
     for(const t of document.querySelectorAll("[data-tone]")){
       const { error } = await sb.from("agent_tones").update({tone:t.value.trim(),updated_at:new Date().toISOString()}).eq("venue",t.dataset.tone);
