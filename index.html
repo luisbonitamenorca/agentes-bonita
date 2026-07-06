@@ -174,6 +174,7 @@ tr:last-child td{border-bottom:none}
   <nav id="nav" style="display:none">
     <button data-view="bandeja" class="active">Bandeja</button>
     <button data-view="whatsapp">WhatsApp</button>
+    <button data-view="prospeccion">Prospección</button>
     <button data-view="agentes">Agentes</button>
     <button data-view="actividad">Actividad</button>
     <button data-view="ajustes">Ajustes</button>
@@ -201,7 +202,7 @@ const AGENTS = [
  {id:"copilot",dom:"Bonita",name:"Copiloto de datos",desc:"Preguntas en lenguaje natural sobre ventas, ocupación y costes. Solo socios.",soon:"FASE 3"},
  {id:"canal",dom:"Hostelero AI",name:"Prospector de canal",desc:"Gestorías y consultoras para el modelo de distribución de Hostelero AI.",soon:"FASE 3"},
  {id:"riva",dom:"Hostelero AI",name:"Vigilante de entrantes",desc:"Seguimiento quincenal de Restaurants IA y nuevos competidores.",soon:"FASE 3"},
- {id:"dist",dom:"Binifadet",name:"Prospector de distribuidores",desc:"Distribuidores y tiendas en península para variedades autóctonas. Pipeline completo: prospección, aprobación, contacto y muestras.",soon:"SIGUIENTE"},
+ {id:"dist",dom:"Binifadet",name:"Prospector de distribuidores",desc:"Distribuidores y tiendas en península para variedades autóctonas. Fase 1 activa: prospección por zonas con búsqueda web y aprobación de fichas.",active:true},
  {id:"astral",dom:"Astral Match",name:"Newsletter de tránsitos",desc:"Redacción semanal con borrador para aprobación antes de envío.",soon:"FASE 2"},
  {id:"club",dom:"Club IA",name:"Preparador de sesiones",desc:"Material didáctico para las sesiones mensuales del Club de la IA.",soon:"FASE 2"}
 ];
@@ -210,6 +211,7 @@ const AGENTS = [
 let session=null, venues={}, reviews=[], runs=[], view="bandeja";
 let waChats=[], waMsgs={}, waActive=null, waBusy=false, waChannel=null, waFilter="all";
 let knowledge=[];
+let prospects=[], prFilter="nuevo", prBusy=false;
 let filters={venue:"all",status:"all",platform:"all"};
 
 const $ = s => document.querySelector(s);
@@ -255,15 +257,17 @@ async function enterApp(){
 
 /* ================= DATOS ================= */
 async function loadAll(){
-  const [t, r, ru, wc, wm, kn] = await Promise.all([
+  const [t, r, ru, wc, wm, kn, pr] = await Promise.all([
     sb.from("agent_tones").select("*").order("sort"),
     sb.from("agent_reviews").select("*"),
     sb.from("agent_runs").select("*").order("ts",{ascending:false}).limit(100),
     sb.from("agent_wa_chats").select("*").order("last_ts",{ascending:false}),
     sb.from("agent_wa_messages").select("*").order("ts"),
-    sb.from("agent_knowledge").select("*").order("updated_at",{ascending:false})
+    sb.from("agent_knowledge").select("*").order("updated_at",{ascending:false}),
+    sb.from("agent_prospects").select("*").order("score",{ascending:false})
   ]);
-  if(t.error||r.error||ru.error||wc.error||wm.error||kn.error){ toast("Error cargando datos de Supabase"); console.error(t.error||r.error||ru.error||wc.error||wm.error||kn.error); return; }
+  if(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error){ toast("Error cargando datos de Supabase"); console.error(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error); return; }
+  prospects = pr.data;
   venues = {}; t.data.forEach(v=> venues[v.venue]={name:v.name,color:v.color,tone:v.tone});
   reviews = r.data; runs = ru.data; knowledge = kn.data;
   waChats = wc.data; waMsgs = {};
@@ -292,6 +296,7 @@ function render(){
   $("#main").className = view==="whatsapp" ? "wide" : "";
   if(view==="bandeja") renderBandeja();
   else if(view==="whatsapp") renderWhatsapp();
+  else if(view==="prospeccion") renderProspeccion();
   else if(view==="agentes") renderAgentes();
   else if(view==="actividad") renderActividad();
   else renderAjustes();
@@ -604,7 +609,109 @@ async function agentReply(chat){
   }
 }
 
-/* ================= AGENTES ================= */
+/* ================= PROSPECCIÓN ================= */
+const PR_STAGES = [["nuevo","Nuevos"],["aprobado","Aprobados"],["contactado","Contactados"],["interesado","Interesados"],["muestras","Muestras"],["cliente","Clientes"],["descartado","Descartados"]];
+
+function renderProspeccion(){
+  const counts = {}; prospects.forEach(p=>counts[p.stage]=(counts[p.stage]||0)+1);
+  const list = prospects.filter(p=>p.stage===prFilter);
+
+  $("#main").innerHTML = `
+    <h2>Prospector de distribuidores — Binifadet</h2>
+    <div class="note">Dale una zona y el agente busca en la web distribuidores y vinotecas que encajen (variedades autóctonas, premium, Baleares), lee sus webs y crea fichas puntuadas. Tú apruebas o descartas — nadie contacta a nadie sin tu visto bueno. Cada run tarda 1-3 minutos y hace varias búsquedas web.</div>
+    <div class="toolbar">
+      <input id="pr-zona" placeholder="Zona (p. ej. Madrid, País Vasco, Barcelona…)" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface)">
+      <button class="btn btn-primary" id="pr-run" ${prBusy?"disabled":""}>${prBusy?'<span class="spin"></span>Prospectando…':"Prospectar zona"}</button>
+    </div>
+    <div class="rail">${PR_STAGES.map(([k,l])=>`<button class="chip" data-prstage="${k}" style="--vc:${k===prFilter?"var(--accent)":"#9AA8B2"};border-color:${k===prFilter?"var(--accent)":"var(--line)"};cursor:pointer">${l} <b>${counts[k]||0}</b></button>`).join("")}</div>
+    <div>${list.length? list.map(prCardHTML).join("") : `<div class="empty"><b>Nada en «${(PR_STAGES.find(s=>s[0]===prFilter)||["",""])[1]}»</b>${prFilter==="nuevo"?"Lanza una prospección arriba para llenar esta bandeja.":"Las fichas llegarán aquí según avancen por el pipeline."}</div>`}</div>`;
+
+  $("#pr-run").onclick = runProspeccion;
+  $("#pr-zona").addEventListener("keydown",e=>{ if(e.key==="Enter") runProspeccion(); });
+  document.querySelectorAll("[data-prstage]").forEach(el=> el.onclick = ()=>{ prFilter = el.dataset.prstage; render(); });
+  bindProspectActions();
+}
+
+function prCardHTML(p){
+  const next = {nuevo:[["aprobado","Aprobar"],["descartado","Descartar"]],
+    aprobado:[["contactado","Marcar contactado"],["descartado","Descartar"]],
+    contactado:[["interesado","Interesado"],["descartado","Descartar"]],
+    interesado:[["muestras","Muestras enviadas"],["descartado","Descartar"]],
+    muestras:[["cliente","¡Cliente!"],["descartado","Descartar"]],
+    cliente:[], descartado:[["nuevo","Recuperar"]]}[p.stage]||[];
+  return `<article class="card" style="--vc:${p.score>=7?"var(--ok)":p.score>=5?"var(--amber)":"var(--danger)"}">
+    <div class="card-head">
+      <span class="venue-tag" style="color:var(--ink)">${esc(p.name)}</span>
+      <span class="platform">${esc(p.zone)}${p.city?" · "+esc(p.city):""}</span>
+      <span class="meta" style="font-family:'IBM Plex Mono',monospace;font-weight:600">encaje ${p.score||"?"}/10</span>
+      <div class="spacer"></div>
+      ${p.web?`<a href="${esc(p.web)}" target="_blank" rel="noopener" class="meta">web ↗</a>`:""}
+    </div>
+    <div class="review-body">
+      <p><b>Perfil:</b> ${esc(p.perfil||"—")}</p>
+      <p style="margin-top:6px"><b>Encaje:</b> ${esc(p.razon||"—")}</p>
+      <p style="margin-top:6px"><b>Ángulo de entrada:</b> ${esc(p.angulo||"—")}</p>
+      ${(p.email||p.phone)?`<p style="margin-top:6px" class="meta">${esc(p.email||"")}${p.email&&p.phone?" · ":""}${esc(p.phone||"")}</p>`:`<p style="margin-top:6px" class="meta">Sin contacto publicado — buscarlo a mano si se aprueba.</p>`}
+    </div>
+    <div class="card-actions">
+      ${next.map(([st,label])=>`<button class="btn ${st==="descartado"?"btn-ghost":"btn-primary"} btn-sm" data-pr="${st}" data-id="${p.id}">${label}</button>`).join("")}
+    </div>
+  </article>`;
+}
+
+function bindProspectActions(){
+  document.querySelectorAll("[data-pr]").forEach(btn=>{
+    btn.onclick = async ()=>{
+      const { error } = await sb.from("agent_prospects").update({stage:btn.dataset.pr,updated_at:new Date().toISOString()}).eq("id",btn.dataset.id);
+      if(error){ toast("No se pudo mover la ficha"); return; }
+      const p = prospects.find(x=>x.id===btn.dataset.id); if(p) p.stage = btn.dataset.pr;
+      render();
+    };
+  });
+}
+
+async function runProspeccion(){
+  const zona = $("#pr-zona").value.trim();
+  if(!zona){ toast("Indica una zona"); return; }
+  if(prBusy) return;
+  prBusy = true; render();
+  try{
+    const existentes = prospects.map(p=>p.name).slice(0,200);
+    const res = await fetch("/api/prospectar",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
+      body:JSON.stringify({zona, existentes})
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||"Error del servidor");
+    let added = 0;
+    for(const f of data.fichas||[]){
+      if(!f.name) continue;
+      const dup = prospects.some(p=> p.name.toLowerCase()===f.name.toLowerCase() || (f.web && p.web===f.web));
+      if(dup) continue;
+      const { data: row, error } = await sb.from("agent_prospects").insert({
+        zone:zona, name:f.name, city:f.city||null, web:f.web||null, email:f.email||null,
+        phone:f.phone||null, perfil:f.perfil||null, score:f.score||null, razon:f.razon||null, angulo:f.angulo||null
+      }).select().single();
+      if(!error){ prospects.push(row); added++; }
+    }
+    prospects.sort((a,b)=>(b.score||0)-(a.score||0));
+    const searchCost = ((data.usage&&data.usage.searches)||0)*0.01;
+    const inTok=(data.usage&&data.usage.input_tokens)||0, outTok=(data.usage&&data.usage.output_tokens)||0;
+    const cost = inTok*PRICE_IN + outTok*PRICE_OUT + searchCost;
+    await sb.from("agent_runs").insert({agent:"Prospector distribuidores",items:added,tokens_in:inTok,tokens_out:outTok,cost});
+    runs.unshift({ts:new Date().toISOString(),agent:"Prospector distribuidores",items:added,tokens_in:inTok,tokens_out:outTok,cost});
+    prFilter = "nuevo";
+    toast(added? added+" ficha"+(added!==1?"s":"")+" nueva"+(added!==1?"s":"")+" de "+zona : "Sin fichas nuevas (candidatos ya fichados o sin encaje)");
+  }catch(err){
+    console.error(err);
+    toast(err.message||"Fallo en la prospección");
+  }finally{
+    prBusy = false; render();
+  }
+}
+
+
 function renderAgentes(){
   $("#main").innerHTML = `<h2>Catálogo de agentes</h2>
   <div class="note">El Analista de reseñas y el Conserje de WhatsApp están operativos en simulación. El resto del catálogo está definido y se activará por fases según el plan.</div>
