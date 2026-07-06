@@ -175,6 +175,7 @@ tr:last-child td{border-bottom:none}
     <button data-view="bandeja" class="active">Bandeja</button>
     <button data-view="whatsapp">WhatsApp</button>
     <button data-view="prospeccion">Prospección</button>
+    <button data-view="horarios">Horarios</button>
     <button data-view="agentes">Agentes</button>
     <button data-view="actividad">Actividad</button>
     <button data-view="ajustes">Ajustes</button>
@@ -211,7 +212,7 @@ let session=null, venues={}, reviews=[], runs=[], view="bandeja";
 let waChats=[], waMsgs={}, waActive=null, waBusy=false, waChannel=null, waFilter="all";
 let knowledge=[];
 let prospects=[], prFilter="nuevo", prBusy=false;
-let syncAlerts=[], syncBusy=null;
+let syncAlerts=[], syncBusy=null, syncChecks=[];
 let filters={venue:"all",status:"all",platform:"all"};
 
 const $ = s => document.querySelector(s);
@@ -257,7 +258,7 @@ async function enterApp(){
 
 /* ================= DATOS ================= */
 async function loadAll(){
-  const [t, r, ru, wc, wm, kn, pr, sa] = await Promise.all([
+  const [t, r, ru, wc, wm, kn, pr, sa, sc] = await Promise.all([
     sb.from("agent_tones").select("*").order("sort"),
     sb.from("agent_reviews").select("*"),
     sb.from("agent_runs").select("*").order("ts",{ascending:false}).limit(100),
@@ -265,9 +266,11 @@ async function loadAll(){
     sb.from("agent_wa_messages").select("*").order("ts"),
     sb.from("agent_knowledge").select("*").order("updated_at",{ascending:false}),
     sb.from("agent_prospects").select("*").order("score",{ascending:false}),
-    sb.from("agent_sync_alerts").select("*").eq("estado","abierta").order("created_at",{ascending:false})
+    sb.from("agent_sync_alerts").select("*").eq("estado","abierta").order("created_at",{ascending:false}),
+    sb.from("agent_sync_checks").select("*").order("created_at",{ascending:false}).limit(60)
   ]);
-  if(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error||sa.error){ toast("Error cargando datos de Supabase"); console.error(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error||sa.error); return; }
+  if(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error||sa.error||sc.error){ toast("Error cargando datos de Supabase"); console.error(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error||sa.error||sc.error); return; }
+  syncChecks = sc.data;
   syncAlerts = sa.data;
   prospects = pr.data;
   venues = {}; t.data.forEach(v=> venues[v.venue]={name:v.name,color:v.color,tone:v.tone});
@@ -299,6 +302,7 @@ function render(){
   if(view==="bandeja") renderBandeja();
   else if(view==="whatsapp") renderWhatsapp();
   else if(view==="prospeccion") renderProspeccion();
+  else if(view==="horarios") renderHorarios();
   else if(view==="agentes") renderAgentes();
   else if(view==="actividad") renderActividad();
   else renderAjustes();
@@ -321,24 +325,7 @@ function renderBandeja(){
 
   const pendingCount = reviews.filter(r=>r.status==="pendiente").length;
 
-  const alertsHTML = syncAlerts.length ? `<div style="margin-bottom:16px">
-    ${syncAlerts.map(a=>{ const v=venues[a.venue]||{name:a.venue,color:"#888"}; return `
-    <div class="card" style="--vc:#C4703E;margin-bottom:10px">
-      <div class="card-head">
-        <span class="venue-tag" style="color:#9A4A1F">⚠ Horarios · ${esc(v.name)}</span>
-        <span class="platform">${esc(a.plataforma)}</span>
-        <span class="meta">${new Date(a.created_at).toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span>
-      </div>
-      <div class="review-body">
-        <p><b>Publicado en ${esc(a.plataforma)}:</b> ${esc(a.encontrado||"—")}</p>
-        <p style="margin-top:4px"><b>Diferencia:</b> ${esc(a.detalle||"—")}</p>
-      </div>
-      <div class="card-actions">
-        <button class="btn btn-primary btn-sm" data-sync="resuelta" data-id="${a.id}">Resuelta (ya corregido)</button>
-        <button class="btn btn-ghost btn-sm" data-sync="ignorada" data-id="${a.id}">Ignorar</button>
-      </div>
-    </div>`;}).join("")}
-  </div>` : "";
+  const alertsHTML = syncAlerts.length ? `<div class="note" id="go-horarios" style="cursor:pointer;border-color:#E0B08A;background:#FBE9E2;color:#9A4A1F">⚠ <b>${syncAlerts.length} discrepancia${syncAlerts.length!==1?"s":""} de horarios</b> detectada${syncAlerts.length!==1?"s":""} por el sincronizador — toca para verla${syncAlerts.length!==1?"s":""} en la pestaña Horarios.</div>` : "";
 
   $("#main").innerHTML = `
     <div class="rail">${rail}</div>
@@ -365,14 +352,7 @@ function renderBandeja(){
   $("#f-platform").onchange = e=>{filters.platform=e.target.value;render();};
   $("#refresh").onclick = async ()=>{ await loadAll(); render(); toast("Actualizado"); };
   $("#run-agent").onclick = runAgent;
-  document.querySelectorAll("[data-sync]").forEach(btn=>{
-    btn.onclick = async ()=>{
-      const { error } = await sb.from("agent_sync_alerts").update({estado:btn.dataset.sync,resolved_at:new Date().toISOString()}).eq("id",btn.dataset.id);
-      if(error){ toast("No se pudo actualizar la alerta"); return; }
-      syncAlerts = syncAlerts.filter(a=>a.id!==btn.dataset.id);
-      render();
-    };
-  });
+  const gh = $("#go-horarios"); if(gh) gh.onclick = ()=>{ view="horarios"; render(); };
   bindCardActions();
 }
 
@@ -742,6 +722,103 @@ async function runProspeccion(){
 }
 
 
+/* ================= HORARIOS (sincronizador) ================= */
+function renderHorarios(){
+  const venueCards = Object.entries(venues).map(([k,v])=>{
+    const doc = knowledge.find(x=>x.venue===k && x.active && /horari/i.test(x.title||""));
+    const last = syncChecks.find(c=>c.venue===k);
+    const openCount = syncAlerts.filter(a=>a.venue===k).length;
+    const estado = !doc ? `<span class="status-pill st-pendiente">Sin fuente de verdad</span>`
+      : openCount ? `<span class="status-pill st-escalado">${openCount} discrepancia${openCount!==1?"s":""}</span>`
+      : last ? `<span class="status-pill st-publicada">Todo coincide</span>`
+      : `<span class="status-pill st-borrador">Sin comprobar aún</span>`;
+    return `<div class="card" style="--vc:${v.color}">
+      <div class="card-head">
+        <span class="venue-tag">${esc(v.name)}</span>
+        <div class="spacer"></div>${estado}
+      </div>
+      <div class="review-body">
+        <p class="meta">${doc?`Fuente de verdad: «${esc(doc.title)}»`:`Falta un documento activo con «Horarios» en el título (Ajustes → base de conocimiento).`}</p>
+        <p class="meta" style="margin-top:4px">${last?`Última comprobación: ${new Date(last.created_at).toLocaleString("es-ES",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})} · ${last.comprobadas} plataforma${last.comprobadas!==1?"s":""} · ${esc(last.resumen||"")}`:"Este local todavía no se ha comprobado."}</p>
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-primary btn-sm" data-sync-run="${k}" ${(!doc||syncBusy)?"disabled":""}>${syncBusy===k?"Comprobando…":"⟳ Comprobar ahora"}</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  const alertCards = syncAlerts.map(a=>{ const v=venues[a.venue]||{name:a.venue,color:"#888"}; return `
+    <div class="card" style="--vc:#C4703E">
+      <div class="card-head">
+        <span class="venue-tag" style="color:#9A4A1F">⚠ ${esc(v.name)}</span>
+        <span class="platform">${esc(a.plataforma)}</span>
+        <span class="meta">${new Date(a.created_at).toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span>
+      </div>
+      <div class="review-body">
+        <p><b>Publicado en ${esc(a.plataforma)}:</b> ${esc(a.encontrado||"—")}</p>
+        <p style="margin-top:4px"><b>Diferencia:</b> ${esc(a.detalle||"—")}</p>
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-primary btn-sm" data-sync="resuelta" data-id="${a.id}">Resuelta (ya corregido)</button>
+        <button class="btn btn-ghost btn-sm" data-sync="ignorada" data-id="${a.id}">Ignorar</button>
+      </div>
+    </div>`;}).join("");
+
+  $("#main").innerHTML = `
+    <h2>Sincronizador de horarios</h2>
+    <div class="note">Cada mañana el agente comprueba un local (rotando: los seis a la semana) contra Google, TripAdvisor y TheFork, usando como verdad el documento «Horarios» activo de cada local. Aquí ves el estado de todos, las discrepancias abiertas y el historial.</div>
+    ${syncAlerts.length?`<h2 style="font-size:16px">Discrepancias abiertas</h2>${alertCards}`:""}
+    <h2 style="font-size:16px;margin-top:${syncAlerts.length?"22px":"0"}">Estado por local</h2>
+    ${venueCards}
+    ${syncChecks.length?`<h2 style="font-size:16px;margin-top:22px">Últimas comprobaciones</h2>
+    <table><thead><tr><th>Fecha</th><th>Local</th><th>Plataformas</th><th>Resultado</th></tr></thead>
+    <tbody>${syncChecks.slice(0,15).map(c=>`<tr>
+      <td>${new Date(c.created_at).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</td>
+      <td>${esc((venues[c.venue]||{}).name||c.venue)}</td><td class="num">${c.comprobadas}</td>
+      <td>${c.ok?"✓ Todo coincide":"⚠ "+c.discrepancias+" discrepancia"+(c.discrepancias!==1?"s":"")}</td>
+    </tr>`).join("")}</tbody></table>`:""}`;
+
+  bindSyncRun();
+  document.querySelectorAll("[data-sync]").forEach(btn=>{
+    btn.onclick = async ()=>{
+      const { error } = await sb.from("agent_sync_alerts").update({estado:btn.dataset.sync,resolved_at:new Date().toISOString()}).eq("id",btn.dataset.id);
+      if(error){ toast("No se pudo actualizar la alerta"); return; }
+      syncAlerts = syncAlerts.filter(a=>a.id!==btn.dataset.id);
+      render();
+    };
+  });
+}
+
+function bindSyncRun(){
+  document.querySelectorAll("[data-sync-run]").forEach(btn=>{
+    btn.onclick = async ()=>{
+      const venue = btn.dataset.syncRun;
+      if(syncBusy) return;
+      syncBusy = venue; render();
+      try{
+        const res = await fetch("/api/sincronizar",{
+          method:"POST",
+          headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
+          body:JSON.stringify({venue})
+        });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error||"Error del servidor");
+        if(data.skipped){ toast(data.motivo); }
+        else{
+          toast(data.discrepancias? data.discrepancias+" discrepancia"+(data.discrepancias!==1?"s":"") : "Comprobado: todo coincide ✓");
+          const [{ data: fa }, { data: fc }] = await Promise.all([
+            sb.from("agent_sync_alerts").select("*").eq("estado","abierta").order("created_at",{ascending:false}),
+            sb.from("agent_sync_checks").select("*").order("created_at",{ascending:false}).limit(60)
+          ]);
+          if(fa) syncAlerts = fa;
+          if(fc) syncChecks = fc;
+        }
+      }catch(err){ console.error(err); toast(err.message||"Fallo en la comprobación"); }
+      finally{ syncBusy = null; render(); }
+    };
+  });
+}
+
 function renderAgentes(){
   $("#main").innerHTML = `<h2>Catálogo de agentes</h2>
   <div class="note">El Analista de reseñas y el Conserje de WhatsApp están operativos en simulación. El resto del catálogo está definido y se activará por fases según el plan.</div>
@@ -877,29 +954,7 @@ function renderAjustes(){
     };
   });
 
-  document.querySelectorAll("[data-sync-run]").forEach(btn=>{
-    btn.onclick = async ()=>{
-      const venue = btn.dataset.syncRun;
-      if(syncBusy) return;
-      syncBusy = venue; render();
-      try{
-        const res = await fetch("/api/sincronizar",{
-          method:"POST",
-          headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
-          body:JSON.stringify({venue})
-        });
-        const data = await res.json();
-        if(!res.ok) throw new Error(data.error||"Error del servidor");
-        if(data.skipped){ toast(data.motivo); }
-        else{
-          toast(data.discrepancias? data.discrepancias+" discrepancia"+(data.discrepancias!==1?"s":"")+" — mira la Bandeja" : "Horarios comprobados: todo coincide ✓");
-          const { data: fresh } = await sb.from("agent_sync_alerts").select("*").eq("estado","abierta").order("created_at",{ascending:false});
-          if(fresh) syncAlerts = fresh;
-        }
-      }catch(err){ console.error(err); toast(err.message||"Fallo en la comprobación"); }
-      finally{ syncBusy = null; render(); }
-    };
-  });
+  bindSyncRun();
 
   document.querySelectorAll("[data-kn-file]").forEach(inp=>{
     inp.onchange = async ()=>{
