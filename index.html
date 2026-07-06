@@ -170,7 +170,7 @@ tr:last-child td{border-bottom:none}
 <body>
 
 <header>
-  <div class="brand">BONITA · AGENTES<small id="mode-label">PANEL DE CONTROL</small></div>
+  <div class="brand">BONITA · AGENTES<small id="mode-label">MARKETING · COMERCIAL</small></div>
   <nav id="nav" style="display:none">
     <button data-view="bandeja" class="active">Bandeja</button>
     <button data-view="whatsapp">WhatsApp</button>
@@ -197,14 +197,13 @@ const PRICE_IN = 3/1e6, PRICE_OUT = 15/1e6;
 const AGENTS = [
  {id:"reviews",dom:"Bonita",name:"Analista de reseñas",desc:"Clasifica reseñas y comentarios de Google, Facebook e Instagram y redacta respuestas por local. Fase A: datos de prueba hasta conectar las APIs.",active:true},
  {id:"wa",dom:"Bonita",name:"Conserje de WhatsApp",desc:"Atiende conversaciones de WhatsApp en tiempo real, responde lo rutinario y escala a humano lo delicado. En simulación hasta conectar la Cloud API.",active:true},
+ {id:"sync",dom:"Bonita",name:"Sincronizador de horarios",desc:"Cada mañana comprueba un local (rotando): compara los horarios publicados en Google, TripAdvisor y TheFork contra la base de conocimiento y alerta de discrepancias en la Bandeja.",active:true},
  {id:"comp",dom:"Bonita",name:"Vigilante de competencia",desc:"Rastreo semanal de competidores de Menorca: cartas, precios, reseñas, prensa.",soon:"FASE 3"},
  {id:"audit",dom:"Bonita",name:"Auditor silencioso",desc:"Cruce diario Ágora × Skello × A3: anomalías de ticket, ratios y descuadres.",soon:"FASE 3"},
  {id:"copilot",dom:"Bonita",name:"Copiloto de datos",desc:"Preguntas en lenguaje natural sobre ventas, ocupación y costes. Solo socios.",soon:"FASE 3"},
  {id:"canal",dom:"Hostelero AI",name:"Prospector de canal",desc:"Gestorías y consultoras para el modelo de distribución de Hostelero AI.",soon:"FASE 3"},
  {id:"riva",dom:"Hostelero AI",name:"Vigilante de entrantes",desc:"Seguimiento quincenal de Restaurants IA y nuevos competidores.",soon:"FASE 3"},
- {id:"dist",dom:"Binifadet",name:"Prospector de distribuidores",desc:"Distribuidores y tiendas en península para variedades autóctonas. Fase 1 activa: prospección por zonas con búsqueda web y aprobación de fichas.",active:true},
- {id:"astral",dom:"Astral Match",name:"Newsletter de tránsitos",desc:"Redacción semanal con borrador para aprobación antes de envío.",soon:"FASE 2"},
- {id:"club",dom:"Club IA",name:"Preparador de sesiones",desc:"Material didáctico para las sesiones mensuales del Club de la IA.",soon:"FASE 2"}
+ {id:"dist",dom:"Binifadet",name:"Prospector de distribuidores",desc:"Distribuidores y tiendas en península para variedades autóctonas. Fase 1 activa: prospección por zonas con búsqueda web y aprobación de fichas.",active:true}
 ];
 
 /* ================= ESTADO ================= */
@@ -212,6 +211,7 @@ let session=null, venues={}, reviews=[], runs=[], view="bandeja";
 let waChats=[], waMsgs={}, waActive=null, waBusy=false, waChannel=null, waFilter="all";
 let knowledge=[];
 let prospects=[], prFilter="nuevo", prBusy=false;
+let syncAlerts=[], syncBusy=null;
 let filters={venue:"all",status:"all",platform:"all"};
 
 const $ = s => document.querySelector(s);
@@ -257,16 +257,18 @@ async function enterApp(){
 
 /* ================= DATOS ================= */
 async function loadAll(){
-  const [t, r, ru, wc, wm, kn, pr] = await Promise.all([
+  const [t, r, ru, wc, wm, kn, pr, sa] = await Promise.all([
     sb.from("agent_tones").select("*").order("sort"),
     sb.from("agent_reviews").select("*"),
     sb.from("agent_runs").select("*").order("ts",{ascending:false}).limit(100),
     sb.from("agent_wa_chats").select("*").order("last_ts",{ascending:false}),
     sb.from("agent_wa_messages").select("*").order("ts"),
     sb.from("agent_knowledge").select("*").order("updated_at",{ascending:false}),
-    sb.from("agent_prospects").select("*").order("score",{ascending:false})
+    sb.from("agent_prospects").select("*").order("score",{ascending:false}),
+    sb.from("agent_sync_alerts").select("*").eq("estado","abierta").order("created_at",{ascending:false})
   ]);
-  if(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error){ toast("Error cargando datos de Supabase"); console.error(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error); return; }
+  if(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error||sa.error){ toast("Error cargando datos de Supabase"); console.error(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error||sa.error); return; }
+  syncAlerts = sa.data;
   prospects = pr.data;
   venues = {}; t.data.forEach(v=> venues[v.venue]={name:v.name,color:v.color,tone:v.tone});
   reviews = r.data; runs = ru.data; knowledge = kn.data;
@@ -319,8 +321,28 @@ function renderBandeja(){
 
   const pendingCount = reviews.filter(r=>r.status==="pendiente").length;
 
+  const alertsHTML = syncAlerts.length ? `<div style="margin-bottom:16px">
+    ${syncAlerts.map(a=>{ const v=venues[a.venue]||{name:a.venue,color:"#888"}; return `
+    <div class="card" style="--vc:#C4703E;margin-bottom:10px">
+      <div class="card-head">
+        <span class="venue-tag" style="color:#9A4A1F">⚠ Horarios · ${esc(v.name)}</span>
+        <span class="platform">${esc(a.plataforma)}</span>
+        <span class="meta">${new Date(a.created_at).toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span>
+      </div>
+      <div class="review-body">
+        <p><b>Publicado en ${esc(a.plataforma)}:</b> ${esc(a.encontrado||"—")}</p>
+        <p style="margin-top:4px"><b>Diferencia:</b> ${esc(a.detalle||"—")}</p>
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-primary btn-sm" data-sync="resuelta" data-id="${a.id}">Resuelta (ya corregido)</button>
+        <button class="btn btn-ghost btn-sm" data-sync="ignorada" data-id="${a.id}">Ignorar</button>
+      </div>
+    </div>`;}).join("")}
+  </div>` : "";
+
   $("#main").innerHTML = `
     <div class="rail">${rail}</div>
+    ${alertsHTML}
     <div class="toolbar">
       <select id="f-venue"><option value="all">Todos los locales</option>${Object.entries(venues).map(([k,v])=>`<option value="${k}" ${f.venue===k?"selected":""}>${esc(v.name)}</option>`).join("")}</select>
       <select id="f-status"><option value="all">Todos los estados</option>
@@ -343,6 +365,14 @@ function renderBandeja(){
   $("#f-platform").onchange = e=>{filters.platform=e.target.value;render();};
   $("#refresh").onclick = async ()=>{ await loadAll(); render(); toast("Actualizado"); };
   $("#run-agent").onclick = runAgent;
+  document.querySelectorAll("[data-sync]").forEach(btn=>{
+    btn.onclick = async ()=>{
+      const { error } = await sb.from("agent_sync_alerts").update({estado:btn.dataset.sync,resolved_at:new Date().toISOString()}).eq("id",btn.dataset.id);
+      if(error){ toast("No se pudo actualizar la alerta"); return; }
+      syncAlerts = syncAlerts.filter(a=>a.id!==btn.dataset.id);
+      render();
+    };
+  });
   bindCardActions();
 }
 
@@ -790,6 +820,7 @@ function renderAjustes(){
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" data-kn="addtext" data-venue="${k}">＋ Documento de texto</button>
         <button class="btn btn-ghost btn-sm" data-kn="addpdf" data-venue="${k}">＋ Subir PDF</button>
+        <button class="btn btn-ghost btn-sm" data-sync-run="${k}" ${syncBusy===k?"disabled":""}>${syncBusy===k?"Comprobando…":"⟳ Comprobar horarios publicados"}</button>
         <input type="file" accept="application/pdf" data-kn-file="${k}" style="display:none">
       </div>
     </div>`;
@@ -843,6 +874,30 @@ function renderAjustes(){
         if(error){ toast("No se pudo borrar"); return; }
         knowledge = knowledge.filter(x=>x.id!==el.dataset.id); render();
       }
+    };
+  });
+
+  document.querySelectorAll("[data-sync-run]").forEach(btn=>{
+    btn.onclick = async ()=>{
+      const venue = btn.dataset.syncRun;
+      if(syncBusy) return;
+      syncBusy = venue; render();
+      try{
+        const res = await fetch("/api/sincronizar",{
+          method:"POST",
+          headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
+          body:JSON.stringify({venue})
+        });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error||"Error del servidor");
+        if(data.skipped){ toast(data.motivo); }
+        else{
+          toast(data.discrepancias? data.discrepancias+" discrepancia"+(data.discrepancias!==1?"s":"")+" — mira la Bandeja" : "Horarios comprobados: todo coincide ✓");
+          const { data: fresh } = await sb.from("agent_sync_alerts").select("*").eq("estado","abierta").order("created_at",{ascending:false});
+          if(fresh) syncAlerts = fresh;
+        }
+      }catch(err){ console.error(err); toast(err.message||"Fallo en la comprobación"); }
+      finally{ syncBusy = null; render(); }
     };
   });
 
