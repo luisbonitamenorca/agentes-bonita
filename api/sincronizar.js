@@ -113,7 +113,14 @@ export default async function handler(req, res) {
       if (ins.ok) creadas++;
     }
 
-    // 4) Registrar el run
+    // 4) Registrar la comprobación y el run
+    const resumen = checks.map(function(c){ return c.plataforma + ": " + (c.coincide ? "OK" : "DISCREPANCIA — " + (c.detalle||"")); }).join(" · ");
+    await fetch(SUPABASE_URL + "/rest/v1/agent_sync_checks", {
+      method: "POST",
+      headers: sbHeaders(SERVICE_KEY),
+      body: JSON.stringify({ venue: venue, ok: creadas === 0, comprobadas: checks.length, discrepancias: creadas, resumen: resumen.slice(0, 800) })
+    });
+
     const inTok = (data.usage && data.usage.input_tokens) || 0;
     const outTok = (data.usage && data.usage.output_tokens) || 0;
     const searches = (data.usage && data.usage.server_tool_use && data.usage.server_tool_use.web_search_requests) || 0;
