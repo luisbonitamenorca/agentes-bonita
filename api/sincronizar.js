@@ -7,7 +7,7 @@ export const maxDuration = 300;
 
 const SUPABASE_URL = "https://kuqhrszlxewonvkkjnsg.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_xmjbr4SQU_4K79wFdGYocg_v1NOj5R5";
-const VENUE_ROTATION = ["rbin", "bod", "tie", "rtam", "btam", "tir"];
+const VENUE_ROTATION = ["bini", "rtam", "btam", "tir"];
 
 function sbHeaders(key) {
   return { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json" };
