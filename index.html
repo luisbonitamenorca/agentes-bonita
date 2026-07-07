@@ -176,6 +176,7 @@ tr:last-child td{border-bottom:none}
     <button data-view="whatsapp">WhatsApp</button>
     <button data-view="prospeccion">Prospección</button>
     <button data-view="horarios">Horarios</button>
+    <button data-view="competencia">Competencia</button>
     <button data-view="agentes">Agentes</button>
     <button data-view="actividad">Actividad</button>
     <button data-view="ajustes">Ajustes</button>
@@ -199,7 +200,7 @@ const AGENTS = [
  {id:"reviews",dom:"Bonita",name:"Analista de reseñas",desc:"Clasifica reseñas y comentarios de Google, Facebook e Instagram y redacta respuestas por local. Fase A: datos de prueba hasta conectar las APIs.",active:true},
  {id:"wa",dom:"Bonita",name:"Conserje de WhatsApp",desc:"Atiende conversaciones de WhatsApp en tiempo real, responde lo rutinario y escala a humano lo delicado. En simulación hasta conectar la Cloud API.",active:true},
  {id:"sync",dom:"Bonita",name:"Sincronizador de horarios",desc:"Cada mañana comprueba un local (rotando): compara los horarios publicados en Google, TripAdvisor y TheFork contra la base de conocimiento y alerta de discrepancias en la Bandeja.",active:true},
- {id:"comp",dom:"Bonita",name:"Vigilante de competencia",desc:"Rastreo semanal de competidores de Menorca: cartas, precios, reseñas, prensa.",soon:"FASE 3"},
+ {id:"comp",dom:"Bonita",name:"Vigilante de competencia",desc:"Cada lunes rastrea novedades de los competidores que definas: cartas, precios, prensa, reseñas y eventos, con fuente. Vigilancia manual por competidor cuando quieras.",active:true},
  {id:"audit",dom:"Bonita",name:"Auditor silencioso",desc:"Cruce diario Ágora × Skello × A3: anomalías de ticket, ratios y descuadres.",soon:"FASE 3"},
  {id:"copilot",dom:"Bonita",name:"Copiloto de datos",desc:"Preguntas en lenguaje natural sobre ventas, ocupación y costes. Solo socios.",soon:"FASE 3"},
  {id:"canal",dom:"Hostelero AI",name:"Prospector de canal",desc:"Gestorías y consultoras para el modelo de distribución de Hostelero AI.",soon:"FASE 3"},
@@ -213,6 +214,7 @@ let waChats=[], waMsgs={}, waActive=null, waBusy=false, waChannel=null, waFilter
 let knowledge=[];
 let prospects=[], prFilter="nuevo", prBusy=false;
 let syncAlerts=[], syncBusy=null, syncChecks=[];
+let competitors=[], findings=[], compBusy=null;
 let filters={venue:"all",status:"all",platform:"all"};
 
 const $ = s => document.querySelector(s);
@@ -258,7 +260,7 @@ async function enterApp(){
 
 /* ================= DATOS ================= */
 async function loadAll(){
-  const [t, r, ru, wc, wm, kn, pr, sa, sc] = await Promise.all([
+  const [t, r, ru, wc, wm, kn, pr, sa, sc, co, fi] = await Promise.all([
     sb.from("agent_tones").select("*").order("sort"),
     sb.from("agent_reviews").select("*"),
     sb.from("agent_runs").select("*").order("ts",{ascending:false}).limit(100),
@@ -267,9 +269,12 @@ async function loadAll(){
     sb.from("agent_knowledge").select("*").order("updated_at",{ascending:false}),
     sb.from("agent_prospects").select("*").order("score",{ascending:false}),
     sb.from("agent_sync_alerts").select("*").eq("estado","abierta").order("created_at",{ascending:false}),
-    sb.from("agent_sync_checks").select("*").order("created_at",{ascending:false}).limit(60)
+    sb.from("agent_sync_checks").select("*").order("created_at",{ascending:false}).limit(60),
+    sb.from("agent_competitors").select("*").order("created_at"),
+    sb.from("agent_watch_findings").select("*").order("created_at",{ascending:false}).limit(120)
   ]);
-  if(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error||sa.error||sc.error){ toast("Error cargando datos de Supabase"); console.error(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error||sa.error||sc.error); return; }
+  if(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error||sa.error||sc.error||co.error||fi.error){ toast("Error cargando datos de Supabase"); console.error(t.error||r.error||ru.error||wc.error||wm.error||kn.error||pr.error||sa.error||sc.error||co.error||fi.error); return; }
+  competitors = co.data; findings = fi.data;
   syncChecks = sc.data;
   syncAlerts = sa.data;
   prospects = pr.data;
@@ -303,6 +308,7 @@ function render(){
   else if(view==="whatsapp") renderWhatsapp();
   else if(view==="prospeccion") renderProspeccion();
   else if(view==="horarios") renderHorarios();
+  else if(view==="competencia") renderCompetencia();
   else if(view==="agentes") renderAgentes();
   else if(view==="actividad") renderActividad();
   else renderAjustes();
@@ -815,6 +821,117 @@ function bindSyncRun(){
         }
       }catch(err){ console.error(err); toast(err.message||"Fallo en la comprobación"); }
       finally{ syncBusy = null; render(); }
+    };
+  });
+}
+
+/* ================= COMPETENCIA (vigilante) ================= */
+const TIPO_LABEL = {carta:"Carta",precios:"Precios",prensa:"Prensa",resenas:"Reseñas",eventos:"Eventos",otro:"Otro"};
+
+function renderCompetencia(){
+  const nuevos = findings.filter(f=>f.estado==="nuevo");
+
+  const compRows = competitors.map(c=>`
+    <div style="display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:8px;background:#fff;${c.active?"":"opacity:.55"}">
+      <input type="checkbox" ${c.active?"checked":""} data-comp="toggle" data-id="${c.id}" title="Activo: el agente lo vigila">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px">${esc(c.name)} <span class="platform" style="margin-left:6px">${esc(c.ambito)}</span></div>
+        <div class="meta">${c.last_checked_at?"Vigilado: "+new Date(c.last_checked_at).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"Nunca vigilado"}${c.notas?" · "+esc(c.notas):""}</div>
+      </div>
+      <button class="btn btn-primary btn-sm" data-comp="run" data-id="${c.id}" ${(!c.active||compBusy)?"disabled":""}>${compBusy===c.id?"Vigilando…":"Vigilar ahora"}</button>
+      <button class="btn btn-ghost btn-sm" data-comp="del" data-id="${c.id}" title="Borrar">✕</button>
+    </div>`).join("");
+
+  const findingCards = findings.slice(0,40).map(f=>{
+    const c = competitors.find(x=>x.id===f.competitor_id)||{name:"?"};
+    return `<article class="card" style="--vc:${f.relevancia>=4?"var(--danger)":f.relevancia===3?"var(--amber)":"#9AA8B2"};${f.estado==="leido"?"opacity:.6":""}">
+      <div class="card-head">
+        <span class="venue-tag" style="color:var(--ink)">${esc(c.name)}</span>
+        <span class="platform">${TIPO_LABEL[f.tipo]||f.tipo}</span>
+        <span class="meta" style="font-family:'IBM Plex Mono',monospace">rel. ${f.relevancia||"?"}/5</span>
+        <span class="meta">${new Date(f.created_at).toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span>
+        <div class="spacer"></div>
+        ${f.estado==="nuevo"?`<span class="status-pill st-borrador">Nuevo</span>`:""}
+      </div>
+      <div class="review-body">
+        <p><b>${esc(f.titulo)}</b></p>
+        <p style="margin-top:4px">${esc(f.detalle||"")}</p>
+        ${f.url?`<p style="margin-top:4px"><a href="${esc(f.url)}" target="_blank" rel="noopener" class="meta">fuente ↗</a></p>`:""}
+      </div>
+      <div class="card-actions">
+        ${f.estado==="nuevo"?`<button class="btn btn-ghost btn-sm" data-find="leido" data-id="${f.id}">Marcar leído</button>`:""}
+        <button class="btn btn-ghost btn-sm" data-find="del" data-id="${f.id}">Eliminar</button>
+      </div>
+    </article>`;
+  }).join("");
+
+  $("#main").innerHTML = `
+    <h2>Vigilante de competencia</h2>
+    <div class="note">Cada lunes el agente vigila los 3 competidores activos con la revisión más antigua: novedades de carta, precios, prensa, reseñas y eventos de los últimos 45 días, siempre con fuente. Añade aquí a quién vigilar — la lista es tuya, no del agente.</div>
+    <h2 style="font-size:16px">Competidores (${competitors.filter(c=>c.active).length} activos)</h2>
+    ${compRows || `<div class="meta" style="margin-bottom:8px;font-style:italic">Sin competidores. Añade el primero.</div>`}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px">
+      <button class="btn btn-ghost btn-sm" id="comp-add">＋ Añadir competidor</button>
+    </div>
+    <h2 style="font-size:16px">Hallazgos${nuevos.length?` · <span style="color:var(--accent)">${nuevos.length} nuevo${nuevos.length!==1?"s":""}</span>`:""}</h2>
+    ${findingCards || `<div class="empty"><b>Sin hallazgos todavía</b>Lanza «Vigilar ahora» sobre un competidor o espera al run del lunes. Si no hay novedades reales, el agente lo dirá con silencio — es su forma de trabajar bien.</div>`}`;
+
+  $("#comp-add").onclick = async ()=>{
+    const name = prompt("Nombre del competidor:"); if(!name) return;
+    const ambito = prompt("Ámbito (restauracion / vino / enoturismo / otro):","restauracion")||"otro";
+    const notas = prompt("Notas para el agente (opcional — qué te interesa de este competidor):")||"";
+    const val = ["restauracion","vino","enoturismo","otro"].includes(ambito.trim())?ambito.trim():"otro";
+    const { data, error } = await sb.from("agent_competitors").insert({name:name.trim(),ambito:val,notas:notas.trim()}).select().single();
+    if(error){ toast("No se pudo añadir"); return; }
+    competitors.push(data); render();
+  };
+
+  document.querySelectorAll("[data-comp]").forEach(el=>{
+    el.onclick = async ()=>{
+      const c = competitors.find(x=>x.id===el.dataset.id);
+      const act = el.dataset.comp;
+      if(act==="toggle"){
+        const { error } = await sb.from("agent_competitors").update({active:!c.active}).eq("id",c.id);
+        if(!error){ c.active=!c.active; render(); }
+      }
+      else if(act==="del"){
+        if(!confirm("¿Borrar a "+c.name+" y todos sus hallazgos?")) return;
+        const { error } = await sb.from("agent_competitors").delete().eq("id",c.id);
+        if(!error){ competitors=competitors.filter(x=>x.id!==c.id); findings=findings.filter(f=>f.competitor_id!==c.id); render(); }
+      }
+      else if(act==="run"){
+        if(compBusy) return;
+        compBusy = c.id; render();
+        try{
+          const res = await fetch("/api/vigilar",{
+            method:"POST",
+            headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
+            body:JSON.stringify({competitor_id:c.id})
+          });
+          const data = await res.json();
+          if(!res.ok) throw new Error(data.error||"Error del servidor");
+          toast(data.hallazgos? data.hallazgos+" hallazgo"+(data.hallazgos!==1?"s":"")+" nuevo"+(data.hallazgos!==1?"s":"") : "Vigilado: sin novedades reales ✓");
+          const [{ data: fc }, { data: fco }] = await Promise.all([
+            sb.from("agent_watch_findings").select("*").order("created_at",{ascending:false}).limit(120),
+            sb.from("agent_competitors").select("*").order("created_at")
+          ]);
+          if(fc) findings = fc;
+          if(fco) competitors = fco;
+        }catch(err){ console.error(err); toast(err.message||"Fallo en la vigilancia"); }
+        finally{ compBusy = null; render(); }
+      }
+    };
+  });
+
+  document.querySelectorAll("[data-find]").forEach(el=>{
+    el.onclick = async ()=>{
+      if(el.dataset.find==="leido"){
+        const { error } = await sb.from("agent_watch_findings").update({estado:"leido"}).eq("id",el.dataset.id);
+        if(!error){ const f=findings.find(x=>x.id===el.dataset.id); if(f) f.estado="leido"; render(); }
+      } else {
+        const { error } = await sb.from("agent_watch_findings").delete().eq("id",el.dataset.id);
+        if(!error){ findings=findings.filter(x=>x.id!==el.dataset.id); render(); }
+      }
     };
   });
 }
