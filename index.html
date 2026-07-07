@@ -201,10 +201,6 @@ const AGENTS = [
  {id:"wa",dom:"Bonita",name:"Conserje de WhatsApp",desc:"Atiende conversaciones de WhatsApp en tiempo real, responde lo rutinario y escala a humano lo delicado. En simulación hasta conectar la Cloud API.",active:true},
  {id:"sync",dom:"Bonita",name:"Sincronizador de horarios",desc:"Cada mañana comprueba un local (rotando): compara los horarios publicados en Google, TripAdvisor y TheFork contra la base de conocimiento y alerta de discrepancias en la Bandeja.",active:true},
  {id:"comp",dom:"Bonita",name:"Vigilante de competencia",desc:"Cada lunes rastrea novedades de los competidores que definas: cartas, precios, prensa, reseñas y eventos, con fuente. Vigilancia manual por competidor cuando quieras.",active:true},
- {id:"audit",dom:"Bonita",name:"Auditor silencioso",desc:"Cruce diario Ágora × Skello × A3: anomalías de ticket, ratios y descuadres.",soon:"FASE 3"},
- {id:"copilot",dom:"Bonita",name:"Copiloto de datos",desc:"Preguntas en lenguaje natural sobre ventas, ocupación y costes. Solo socios.",soon:"FASE 3"},
- {id:"canal",dom:"Hostelero AI",name:"Prospector de canal",desc:"Gestorías y consultoras para el modelo de distribución de Hostelero AI.",soon:"FASE 3"},
- {id:"riva",dom:"Hostelero AI",name:"Vigilante de entrantes",desc:"Seguimiento quincenal de Restaurants IA y nuevos competidores.",soon:"FASE 3"},
  {id:"dist",dom:"Binifadet",name:"Prospector de distribuidores",desc:"Distribuidores y tiendas en península para variedades autóctonas. Fase 1 activa: prospección por zonas con búsqueda web y aprobación de fichas.",active:true}
 ];
 
@@ -303,6 +299,10 @@ function subscribeWA(){
 /* ================= ROUTER ================= */
 function render(){
   document.querySelectorAll("#nav [data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+  const hb = document.querySelector('#nav [data-view="horarios"]');
+  if(hb) hb.textContent = syncAlerts.length ? `Horarios (${syncAlerts.length})` : "Horarios";
+  const cb = document.querySelector('#nav [data-view="competencia"]');
+  if(cb){ const n = findings.filter(f=>f.estado==="nuevo").length; cb.textContent = n ? `Competencia (${n})` : "Competencia"; }
   $("#main").className = view==="whatsapp" ? "wide" : "";
   if(view==="bandeja") renderBandeja();
   else if(view==="whatsapp") renderWhatsapp();
@@ -331,11 +331,37 @@ function renderBandeja(){
 
   const pendingCount = reviews.filter(r=>r.status==="pendiente").length;
 
-  const alertsHTML = syncAlerts.length ? `<div class="note" id="go-horarios" style="cursor:pointer;border-color:#E0B08A;background:#FBE9E2;color:#9A4A1F">⚠ <b>${syncAlerts.length} discrepancia${syncAlerts.length!==1?"s":""} de horarios</b> detectada${syncAlerts.length!==1?"s":""} por el sincronizador — toca para verla${syncAlerts.length!==1?"s":""} en la pestaña Horarios.</div>` : "";
+  const pendCount = p => reviews.filter(r=>(p==="all"||r.platform===p)&&(r.status==="pendiente"||r.status==="borrador")).length;
+  const platTabs = ["all","Google","Facebook","Instagram"].map(p=>
+    `<button class="chip" data-plat="${p}" style="--vc:${f.platform===p?"var(--accent)":"#9AA8B2"};border-color:${f.platform===p?"var(--accent)":"var(--line)"};cursor:pointer;font-weight:${f.platform===p?"700":"600"}">${p==="all"?"Todas":p} <b>${pendCount(p)}</b></button>`).join("");
+
+  let googleStats = "";
+  if(f.platform==="Google"){
+    const gr = reviews.filter(r=>r.platform==="Google" && r.rating!=null && r.status!=="descartada");
+    if(gr.length){
+      const avg = a => a.length? (a.reduce((s,r)=>s+r.rating,0)/a.length) : null;
+      const g30 = gr.filter(r=>{ const d=new Date(r.review_date); return (Date.now()-d.getTime())<30*864e5; });
+      const media = avg(gr), media30 = avg(g30);
+      const cincos = gr.filter(r=>r.rating===5).length, bajas = gr.filter(r=>r.rating<=2).length;
+      const porLocal = Object.entries(venues).map(([k,v])=>{
+        const vr = gr.filter(r=>r.venue===k); if(!vr.length) return "";
+        return `<div class="chip" style="--vc:${v.color}">${esc(v.name.replace(" Binifadet","").replace("Restaurante ","Rest. "))} <b>${avg(vr).toFixed(1)}★ · ${vr.length}</b></div>`;
+      }).join("");
+      googleStats = `
+      <div class="kpis">
+        <div class="kpi"><div class="v">${media.toFixed(2)}★</div><div class="l">Media global (${gr.length} reseñas)</div></div>
+        <div class="kpi"><div class="v">${media30?media30.toFixed(2)+"★":"—"}</div><div class="l">Media últimos 30 días${g30.length?" ("+g30.length+")":""}</div></div>
+        <div class="kpi"><div class="v">${Math.round(cincos/gr.length*100)}%</div><div class="l">Reseñas de 5★</div></div>
+        <div class="kpi"><div class="v">${Math.round(bajas/gr.length*100)}%</div><div class="l">Reseñas de 1-2★</div></div>
+      </div>
+      <div class="rail" style="padding-top:0">${porLocal}</div>`;
+    }
+  }
 
   $("#main").innerHTML = `
     <div class="rail">${rail}</div>
-    ${alertsHTML}
+    <div class="rail" style="padding-top:0">${platTabs}</div>
+    ${googleStats}
     <div class="toolbar">
       <select id="f-venue"><option value="all">Todos los locales</option>${Object.entries(venues).map(([k,v])=>`<option value="${k}" ${f.venue===k?"selected":""}>${esc(v.name)}</option>`).join("")}</select>
       <select id="f-status"><option value="all">Todos los estados</option>
@@ -343,10 +369,6 @@ function renderBandeja(){
         <option value="borrador" ${f.status==="borrador"?"selected":""}>Con borrador</option>
         <option value="publicada" ${f.status==="publicada"?"selected":""}>Publicada</option>
         <option value="descartada" ${f.status==="descartada"?"selected":""}>Descartada</option></select>
-      <select id="f-platform"><option value="all">Todas las plataformas</option>
-        <option ${f.platform==="Google"?"selected":""}>Google</option>
-        <option ${f.platform==="Instagram"?"selected":""}>Instagram</option>
-        <option ${f.platform==="Facebook"?"selected":""}>Facebook</option></select>
       <div class="spacer"></div>
       <button class="btn btn-ghost" id="refresh" title="Recargar">↻</button>
       <button class="btn btn-primary" id="run-agent" ${pendingCount===0?"disabled":""}>Generar borradores (${pendingCount})</button>
@@ -355,10 +377,9 @@ function renderBandeja(){
 
   $("#f-venue").onchange = e=>{filters.venue=e.target.value;render();};
   $("#f-status").onchange = e=>{filters.status=e.target.value;render();};
-  $("#f-platform").onchange = e=>{filters.platform=e.target.value;render();};
+  document.querySelectorAll("[data-plat]").forEach(el=> el.onclick = ()=>{ filters.platform = el.dataset.plat; render(); });
   $("#refresh").onclick = async ()=>{ await loadAll(); render(); toast("Actualizado"); };
   $("#run-agent").onclick = runAgent;
-  const gh = $("#go-horarios"); if(gh) gh.onclick = ()=>{ view="horarios"; render(); };
   bindCardActions();
 }
 
@@ -938,7 +959,7 @@ function renderCompetencia(){
 
 function renderAgentes(){
   $("#main").innerHTML = `<h2>Catálogo de agentes</h2>
-  <div class="note">El Analista de reseñas y el Conserje de WhatsApp están operativos en simulación. El resto del catálogo está definido y se activará por fases según el plan.</div>
+  <div class="note">Los cinco agentes de este panel están operativos. Los agentes de otras áreas (dirección, contabilidad, RRHH, cocina) vivirán en sus propios paneles.</div>
   <div class="agent-grid">${AGENTS.map(a=>`
     <div class="agent">
       <div class="dom">${esc(a.dom)}</div>
