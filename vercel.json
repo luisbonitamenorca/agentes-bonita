@@ -1,6 +1,7 @@
 {
   "crons": [
     { "path": "/api/sincronizar", "schedule": "0 7 * * *" },
-    { "path": "/api/vigilar", "schedule": "0 8 * * 1" }
+    { "path": "/api/vigilar", "schedule": "0 8 * * 1" },
+    { "path": "/api/subvenciones", "schedule": "30 6 * * 1" }
   ]
 }
